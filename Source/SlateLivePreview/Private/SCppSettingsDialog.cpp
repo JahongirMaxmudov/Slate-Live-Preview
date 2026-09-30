@@ -730,7 +730,7 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 									.Padding(0.0f, 0.0f, 6.0f, 0.0f)
 									[
 										SNew(SImage)
-										.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.AiSparkle")))
+										.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.AIAssistant")))
 										.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
 									]
 									+ SHorizontalBox::Slot()
@@ -882,6 +882,10 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 											if (!ActiveGitHubUserCode.IsEmpty())
 											{
 												return FText::FromString(TEXT("Restart Device Flow"));
+											}
+											if (bIsDeviceAuthInProgress)
+											{
+												return FText::FromString(TEXT("Cancel Authorization"));
 											}
 											return FText::FromString(TEXT("Sign in with GitHub (Device Flow)"));
 										})
@@ -1141,6 +1145,17 @@ void SCppSettingsDialog::UpdateGitHubAuthCard()
 
 FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 {
+	if (bIsDeviceAuthInProgress && ActiveGitHubUserCode.IsEmpty())
+	{
+		FCppAiAssistant::Get().CancelGitHubAuth();
+		bIsDeviceAuthInProgress = false;
+		ActiveGitHubUserCode.Empty();
+		ActiveGitHubVerificationUri.Empty();
+		GitHubAuthStatusMessage = TEXT("Authorization cancelled.");
+		return FReply::Handled();
+	}
+
+	bIsDeviceAuthInProgress = true;
 	ActiveGitHubUserCode.Empty();
 	ActiveGitHubVerificationUri.Empty();
 	GitHubAuthStatusMessage = TEXT("Contacting GitHub for device authorization code...");
@@ -1151,6 +1166,7 @@ FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 		{
 			if (TSharedPtr<SCppSettingsDialog> Pinned = WeakThis.Pin())
 			{
+				Pinned->bIsDeviceAuthInProgress = true;
 				Pinned->ActiveGitHubUserCode = UserCode;
 				Pinned->ActiveGitHubVerificationUri = Uri;
 				Pinned->GitHubAuthStatusMessage = FString::Printf(TEXT("Code received: %s — waiting for browser confirmation..."), *UserCode);
@@ -1172,6 +1188,7 @@ FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 		{
 			if (TSharedPtr<SCppSettingsDialog> Pinned = WeakThis.Pin())
 			{
+				Pinned->bIsDeviceAuthInProgress = false;
 				Pinned->ActiveGitHubUserCode.Empty();
 				if (bSuccess)
 				{
@@ -1220,6 +1237,7 @@ FReply SCppSettingsDialog::OnCopyUserCodeClicked()
 FReply SCppSettingsDialog::OnSignOutOfGitHubClicked()
 {
 	FCppAiAssistant::Get().SignOutOfGitHub();
+	bIsDeviceAuthInProgress = false;
 	ActiveGitHubUserCode.Empty();
 	ActiveGitHubVerificationUri.Empty();
 	GitHubAuthStatusMessage = TEXT("Signed out of GitHub Copilot.");
@@ -1301,8 +1319,8 @@ FReply SCppSettingsDialog::OnApplyClicked()
 void SCppSettingsDialog::OpenModal(TSharedPtr<SWidget> ParentWidget)
 {
 	TSharedRef<SWindow> Window = SNew(SWindow)
-		.Title(FText::FromString(TEXT("C++ Studio Settings")))
-		.ClientSize(FVector2D(660.0f, 700.0f))
+		.Title(FText::FromString(TEXT("C++ Studio Settings & Preferences")))
+		.ClientSize(FVector2D(680.0f, 720.0f))
 		.SupportsMaximize(false)
 		.SupportsMinimize(false)
 		.SizingRule(ESizingRule::FixedSize);
@@ -1312,12 +1330,24 @@ void SCppSettingsDialog::OpenModal(TSharedPtr<SWidget> ParentWidget)
 		.ParentWindow(Window)
 	);
 
+	TSharedPtr<SWindow> ParentTopLevelWindow;
 	if (ParentWidget.IsValid())
 	{
-		FSlateApplication::Get().AddModalWindow(Window, ParentWidget);
+		ParentTopLevelWindow = FSlateApplication::Get().FindWidgetWindow(ParentWidget.ToSharedRef());
+	}
+	if (!ParentTopLevelWindow.IsValid())
+	{
+		ParentTopLevelWindow = FSlateApplication::Get().GetActiveTopLevelWindow();
+	}
+
+	if (ParentTopLevelWindow.IsValid())
+	{
+		FSlateApplication::Get().AddWindowAsNativeChild(Window, ParentTopLevelWindow.ToSharedRef());
 	}
 	else
 	{
 		FSlateApplication::Get().AddWindow(Window);
 	}
+
+	Window->BringToFront();
 }

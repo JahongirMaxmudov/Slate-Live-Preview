@@ -369,5 +369,33 @@ bool FSlateLivePreviewStudioTabTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ----------------------------------------------------------------------------
+// Test 10: Settings Dialog & GitHub Copilot Auth Flow
+// ----------------------------------------------------------------------------
+#include "SCppSettingsDialog.h"
+#include "CppAiAssistant.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSlateLivePreviewSettingsDialogTest,
+	"SlateLivePreview.Settings.DialogInstantiationAndAiConfig",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSlateLivePreviewSettingsDialogTest::RunTest(const FString& Parameters)
+{
+	TSharedRef<SWindow> DummyWindow = SNew(SWindow);
+	TSharedRef<SCppSettingsDialog> Dialog = SNew(SCppSettingsDialog).ParentWindow(DummyWindow);
+	TestTrue(TEXT("SCppSettingsDialog instantiates cleanly"), Dialog != SNullWidget::NullWidget);
+
+	// Verify FCppAiAssistant singleton
+	FCppAiAssistant& Assistant = FCppAiAssistant::Get();
+	TestFalse(TEXT("No request should be active initially"), Assistant.IsRequestActive());
+
+	// Verify default provider endpoints
+	FString CopilotEndpoint = FCppEditorSettings::GetDefaultEndpointForProvider(EAiProvider::GitHubCopilot);
+	TestEqual(TEXT("Copilot endpoint is correct"), CopilotEndpoint, TEXT("https://api.githubcopilot.com"));
+
+	return true;
+}
+
 #endif
 

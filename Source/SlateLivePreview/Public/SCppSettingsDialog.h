@@ -78,6 +78,7 @@ private:
 	FString ActiveGitHubUserCode;
 	FString ActiveGitHubVerificationUri;
 	FString GitHubAuthStatusMessage;
+	bool bIsDeviceAuthInProgress = false;
 
 	void UpdatePreview();
 	void UpdateAiProviderDefaults();
