@@ -103,6 +103,7 @@ public:
 
 	// Gutter & Status Bar Accessors
 	int32 GetTotalLineCount() const;
+	float GetEditorLineHeight() const;
 	int32 GetCurrentLineIndex() const;
 	int32 GetCurrentColumnIndex() const;
 

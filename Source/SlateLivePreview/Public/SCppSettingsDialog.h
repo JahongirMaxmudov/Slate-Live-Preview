@@ -77,6 +77,7 @@ private:
 	TSharedPtr<SButton> GitHubSignInButton;
 	FString ActiveGitHubUserCode;
 	FString ActiveGitHubVerificationUri;
+	FString GitHubAuthStatusMessage;
 
 	void UpdatePreview();
 	void UpdateAiProviderDefaults();

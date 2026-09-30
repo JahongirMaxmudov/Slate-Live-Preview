@@ -52,10 +52,10 @@ public:
 		if (OwnerPane && TargetTextBox.IsValid())
 		{
 			FVector2D LocalPos = MyGeometry.AbsoluteToLocal(MouseEvent.GetScreenSpacePosition());
-			const float LineHeight = 18.0f;
+			const float LineHeight = OwnerPane->GetEditorLineHeight();
 			int32 TotalLines = OwnerPane->GetTotalLineCount();
 			int32 FirstLine = 0;
-			if (TargetTextBox.Pin()->GetVScrollBar().IsValid())
+			if (TargetTextBox.Pin()->GetVScrollBar().IsValid() && TargetTextBox.Pin()->GetVScrollBar()->IsNeeded())
 			{
 				float ScrollFraction = TargetTextBox.Pin()->GetVScrollBar()->DistanceFromTop();
 				FirstLine = FMath::Clamp(FMath::FloorToInt(ScrollFraction * TotalLines), 0, FMath::Max(0, TotalLines - 1));
@@ -114,10 +114,10 @@ public:
 		}
 
 		int32 CurrentLine = OwnerPane->GetCurrentLineIndex();
-		const float LineHeight = 18.0f;
+		const float LineHeight = OwnerPane->GetEditorLineHeight();
 
 		int32 FirstLine = 0;
-		if (TargetTextBox.Pin()->GetVScrollBar().IsValid())
+		if (TargetTextBox.Pin()->GetVScrollBar().IsValid() && TargetTextBox.Pin()->GetVScrollBar()->IsNeeded())
 		{
 			float ScrollFraction = TargetTextBox.Pin()->GetVScrollBar()->DistanceFromTop();
 			FirstLine = FMath::Clamp(FMath::FloorToInt(ScrollFraction * TotalLines), 0, FMath::Max(0, TotalLines - 1));
@@ -211,9 +211,9 @@ public:
 		}
 
 		TSharedPtr<SMultiLineEditableTextBox> TextBox = TargetTextBox.Pin();
-		const float LineHeight = 18.0f;
+		const float LineHeight = OwnerPane ? OwnerPane->GetEditorLineHeight() : 18.0f;
 		int32 FirstLine = 0;
-		if (TextBox->GetVScrollBar().IsValid())
+		if (TextBox->GetVScrollBar().IsValid() && TextBox->GetVScrollBar()->IsNeeded())
 		{
 			float ScrollFraction = TextBox->GetVScrollBar()->DistanceFromTop();
 			FirstLine = FMath::Clamp(FMath::FloorToInt(ScrollFraction * TotalLines), 0, FMath::Max(0, TotalLines - 1));
@@ -3833,13 +3833,10 @@ FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
 		return FString();
 	}
 
-	FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont();
-	TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
-	const float MeasuredLineHeight = (float)FontMeasure->GetMaxCharacterHeight(FontInfo);
-	const float LineHeight = FMath::Max(18.0f, MeasuredLineHeight + 4.0f);
+	const float LineHeight = GetEditorLineHeight();
 
 	int32 FirstLine = 0;
-	if (CodeTextBox->GetVScrollBar().IsValid())
+	if (CodeTextBox->GetVScrollBar().IsValid() && CodeTextBox->GetVScrollBar()->IsNeeded())
 	{
 		float ScrollFraction = CodeTextBox->GetVScrollBar()->DistanceFromTop();
 		FirstLine = FMath::Clamp(FMath::FloorToInt(ScrollFraction * TotalLines), 0, FMath::Max(0, TotalLines - 1));
@@ -3864,6 +3861,9 @@ FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
 	{
 		return FString();
 	}
+
+	FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont();
+	TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
 
 	// Estimate character position by measuring substrings
 	float TargetX = (float)LocalPos.X - 4.0f;
@@ -4731,6 +4731,12 @@ int32 SCppEditorPane::GetTotalLineCount() const
 		return Lines;
 	}
 	return 0;
+}
+
+float SCppEditorPane::GetEditorLineHeight() const
+{
+	const int32 Size = FCppEditorSettings::Get().FontSize;
+	return FMath::RoundToFloat((float)Size * (18.0f / 11.0f));
 }
 
 int32 SCppEditorPane::GetCurrentLineIndex() const

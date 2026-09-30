@@ -21,6 +21,8 @@
 #include "CppAiAssistant.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "HAL/PlatformProcess.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 static const TCHAR* SettingsSampleCode = 
 	TEXT("#include \"CoreMinimal.h\"\n")
@@ -739,10 +741,22 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 										.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9.0f))
 										.ColorAndOpacity_Lambda([this]()
 										{
+											if (!GitHubAuthStatusMessage.IsEmpty() && (GitHubAuthStatusMessage.Contains(TEXT("failed")) || GitHubAuthStatusMessage.Contains(TEXT("Failed")) || GitHubAuthStatusMessage.Contains(TEXT("timed out"))))
+											{
+												return FLinearColor(1.0f, 0.35f, 0.35f, 1.0f);
+											}
+											if (!ActiveGitHubUserCode.IsEmpty())
+											{
+												return FLinearColor(1.0f, 0.85f, 0.2f, 1.0f);
+											}
 											return FCppAiAssistant::Get().IsGitHubAuthenticated() ? FLinearColor(0.35f, 0.88f, 0.50f, 1.0f) : FLinearColor(0.9f, 0.9f, 0.95f, 1.0f);
 										})
 										.Text_Lambda([this]() -> FText
 										{
+											if (!GitHubAuthStatusMessage.IsEmpty())
+											{
+												return FText::FromString(GitHubAuthStatusMessage);
+											}
 											const FCppEditorSettings& Settings = FCppEditorSettings::Get();
 											if (FCppAiAssistant::Get().IsGitHubAuthenticated())
 											{
@@ -755,6 +769,93 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 											}
 											return FText::FromString(TEXT("Authenticate via GitHub OAuth (VS Code Device Flow):"));
 										})
+									]
+								]
+
+								// Dedicated Device Code Display Banner (appears during device auth flow)
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 6.0f, 0.0f, 6.0f)
+								[
+									SNew(SBorder)
+									.Visibility_Lambda([this]()
+									{
+										return ActiveGitHubUserCode.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible;
+									})
+									.BorderBackgroundColor(FLinearColor(0.08f, 0.22f, 0.42f, 0.95f))
+									.Padding(FMargin(12.0f, 10.0f))
+									[
+										SNew(SVerticalBox)
+										// Header label
+										+ SVerticalBox::Slot()
+										.AutoHeight()
+										.Padding(0.0f, 0.0f, 0.0f, 4.0f)
+										[
+											SNew(STextBlock)
+											.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9.5f))
+											.ColorAndOpacity(FLinearColor(1.0f, 0.85f, 0.25f, 1.0f))
+											.Text(FText::FromString(TEXT("1. Copy this GitHub Device Code:")))
+										]
+										// Big Code Display & Action Buttons
+										+ SVerticalBox::Slot()
+										.AutoHeight()
+										.Padding(0.0f, 2.0f, 0.0f, 6.0f)
+										[
+											SNew(SHorizontalBox)
+											+ SHorizontalBox::Slot()
+											.AutoWidth()
+											.VAlign(VAlign_Center)
+											[
+												SNew(SBorder)
+												.BorderBackgroundColor(FLinearColor(0.03f, 0.08f, 0.16f, 1.0f))
+												.Padding(FMargin(14.0f, 6.0f))
+												[
+													SNew(STextBlock)
+													.Font(FCoreStyle::GetDefaultFontStyle("Bold", 18.0f))
+													.ColorAndOpacity(FLinearColor(0.25f, 1.0f, 0.6f, 1.0f))
+													.Text_Lambda([this]()
+													{
+														return FText::FromString(ActiveGitHubUserCode);
+													})
+												]
+											]
+											+ SHorizontalBox::Slot()
+											.AutoWidth()
+											.VAlign(VAlign_Center)
+											.Padding(10.0f, 0.0f, 6.0f, 0.0f)
+											[
+												SNew(SButton)
+												.ButtonStyle(FAppStyle::Get(), "PrimaryButton")
+												.ContentPadding(FMargin(10.0f, 6.0f))
+												.Text(FText::FromString(TEXT("Copy Code")))
+												.ToolTipText(FText::FromString(TEXT("Copy this 8-digit code to clipboard")))
+												.OnClicked(this, &SCppSettingsDialog::OnCopyUserCodeClicked)
+											]
+											+ SHorizontalBox::Slot()
+											.AutoWidth()
+											.VAlign(VAlign_Center)
+											[
+												SNew(SButton)
+												.ContentPadding(FMargin(10.0f, 6.0f))
+												.Text(FText::FromString(TEXT("Open Browser")))
+												.ToolTipText(FText::FromString(TEXT("Open github.com/login/device in your default browser")))
+												.OnClicked_Lambda([this]()
+												{
+													const FString TargetUrl = ActiveGitHubVerificationUri.IsEmpty() ? FString(TEXT("https://github.com/login/device")) : ActiveGitHubVerificationUri;
+													FPlatformProcess::LaunchURL(*TargetUrl, nullptr, nullptr);
+													return FReply::Handled();
+												})
+											]
+										]
+										// Helpful instruction note
+										+ SVerticalBox::Slot()
+										.AutoHeight()
+										[
+											SNew(STextBlock)
+											.Font(FCoreStyle::GetDefaultFontStyle("Italic", 8.5f))
+											.ColorAndOpacity(FLinearColor(0.8f, 0.85f, 0.95f, 0.9f))
+											.Text(FText::FromString(TEXT("2. The code is already copied to clipboard! Switch to your browser window (may be minimized or behind Unreal), paste code & authorize.")))
+										]
 									]
 								]
 
@@ -774,28 +875,18 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 										.ButtonStyle(FAppStyle::Get(), "PrimaryButton")
 										.Text_Lambda([this]()
 										{
-											return FCppAiAssistant::Get().IsGitHubAuthenticated() ? FText::FromString(TEXT("Re-authenticate")) : FText::FromString(TEXT("Sign in with GitHub (Device Flow)"));
+											if (FCppAiAssistant::Get().IsGitHubAuthenticated())
+											{
+												return FText::FromString(TEXT("Re-authenticate"));
+											}
+											if (!ActiveGitHubUserCode.IsEmpty())
+											{
+												return FText::FromString(TEXT("Restart Device Flow"));
+											}
+											return FText::FromString(TEXT("Sign in with GitHub (Device Flow)"));
 										})
 										.ToolTipText(FText::FromString(TEXT("Opens github.com/login/device with a verification code, exactly like in VS Code Copilot")))
 										.OnClicked(this, &SCppSettingsDialog::OnSignInWithGitHubClicked)
-									]
-
-									// Copy Code Button (appears during device flow)
-									+ SHorizontalBox::Slot()
-									.AutoWidth()
-									.Padding(0.0f, 0.0f, 6.0f, 0.0f)
-									[
-										SNew(SButton)
-										.Visibility_Lambda([this]()
-										{
-											return ActiveGitHubUserCode.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible;
-										})
-										.Text_Lambda([this]()
-										{
-											return FText::FromString(FString::Printf(TEXT("Copy Code [%s]"), *ActiveGitHubUserCode));
-										})
-										.ToolTipText(FText::FromString(TEXT("Copy verification code and open browser authorization page")))
-										.OnClicked(this, &SCppSettingsDialog::OnCopyUserCodeClicked)
 									]
 
 									// Sign Out Button
@@ -1052,11 +1143,7 @@ FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 {
 	ActiveGitHubUserCode.Empty();
 	ActiveGitHubVerificationUri.Empty();
-
-	if (GitHubAuthStatusText.IsValid())
-	{
-		GitHubAuthStatusText->SetText(FText::FromString(TEXT("Connecting to GitHub...")));
-	}
+	GitHubAuthStatusMessage = TEXT("Contacting GitHub for device authorization code...");
 
 	TWeakPtr<SCppSettingsDialog> WeakThis = SharedThis(this);
 	FCppAiAssistant::Get().StartGitHubDeviceFlow(
@@ -1066,7 +1153,20 @@ FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 			{
 				Pinned->ActiveGitHubUserCode = UserCode;
 				Pinned->ActiveGitHubVerificationUri = Uri;
+				Pinned->GitHubAuthStatusMessage = FString::Printf(TEXT("Code received: %s — waiting for browser confirmation..."), *UserCode);
 			}
+
+			// Show Notification Toast with link and code
+			FNotificationInfo Info(FText::FromString(FString::Printf(TEXT("GitHub Copilot Code: %s (Copied to Clipboard)"), *UserCode)));
+			Info.ExpireDuration = 15.0f;
+			Info.bFireAndForget = true;
+			const FString LaunchUri = Uri;
+			Info.Hyperlink = FSimpleDelegate::CreateLambda([LaunchUri]()
+			{
+				FPlatformProcess::LaunchURL(*LaunchUri, nullptr, nullptr);
+			});
+			Info.HyperlinkText = FText::FromString(TEXT("Open Browser (github.com/login/device)"));
+			FSlateNotificationManager::Get().AddNotification(Info);
 		}),
 		FOnGitHubAuthComplete::CreateLambda([WeakThis](bool bSuccess, const FString& MessageOrUser)
 		{
@@ -1079,12 +1179,20 @@ FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 					Pinned->TempAiApiKey = Settings.GitHubAccessToken;
 					Pinned->TempAiEndpoint = Settings.AiEndpoint;
 					Pinned->TempAiModel = Settings.AiModel;
+					Pinned->GitHubAuthStatusMessage = FString::Printf(TEXT("Signed in as %s! Copilot is active."), *MessageOrUser);
 				}
-				else if (Pinned->GitHubAuthStatusText.IsValid())
+				else
 				{
-					Pinned->GitHubAuthStatusText->SetText(FText::FromString(MessageOrUser));
+					Pinned->GitHubAuthStatusMessage = FString::Printf(TEXT("GitHub sign in failed: %s"), *MessageOrUser);
 				}
 			}
+
+			FNotificationInfo Info(FText::FromString(bSuccess 
+				? FString::Printf(TEXT("GitHub Copilot Connected: %s"), *MessageOrUser)
+				: FString::Printf(TEXT("GitHub Copilot Failed: %s"), *MessageOrUser)));
+			Info.ExpireDuration = 6.0f;
+			Info.bFireAndForget = true;
+			FSlateNotificationManager::Get().AddNotification(Info);
 		})
 	);
 
@@ -1096,6 +1204,11 @@ FReply SCppSettingsDialog::OnCopyUserCodeClicked()
 	if (!ActiveGitHubUserCode.IsEmpty())
 	{
 		FPlatformApplicationMisc::ClipboardCopy(*ActiveGitHubUserCode);
+
+		FNotificationInfo Info(FText::FromString(FString::Printf(TEXT("Copied '%s' to clipboard!"), *ActiveGitHubUserCode)));
+		Info.ExpireDuration = 3.0f;
+		Info.bFireAndForget = true;
+		FSlateNotificationManager::Get().AddNotification(Info);
 	}
 	if (!ActiveGitHubVerificationUri.IsEmpty())
 	{
@@ -1109,7 +1222,14 @@ FReply SCppSettingsDialog::OnSignOutOfGitHubClicked()
 	FCppAiAssistant::Get().SignOutOfGitHub();
 	ActiveGitHubUserCode.Empty();
 	ActiveGitHubVerificationUri.Empty();
+	GitHubAuthStatusMessage = TEXT("Signed out of GitHub Copilot.");
 	TempAiApiKey.Empty();
+
+	FNotificationInfo Info(FText::FromString(TEXT("Signed out of GitHub Copilot.")));
+	Info.ExpireDuration = 4.0f;
+	Info.bFireAndForget = true;
+	FSlateNotificationManager::Get().AddNotification(Info);
+
 	return FReply::Handled();
 }
 
