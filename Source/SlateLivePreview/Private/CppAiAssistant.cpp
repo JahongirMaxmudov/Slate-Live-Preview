@@ -30,12 +30,16 @@ void FCppAiAssistant::CancelPendingCompletion()
 	bIsRequestInFlight = false;
 }
 
-FString FCppAiAssistant::CleanGeneratedCode(const FString& RawResponse)
+FString FCppAiAssistant::CleanGeneratedCode(const FString& RawResponse, const FString& Prefix, const FString& Suffix)
 {
 	FString Code = RawResponse.TrimStartAndEnd();
 
 	// Strip markdown code block fences if present
 	if (Code.StartsWith(TEXT("```cpp")))
+	{
+		Code = Code.Mid(6).TrimStart();
+	}
+	else if (Code.StartsWith(TEXT("```c++")))
 	{
 		Code = Code.Mid(6).TrimStart();
 	}
@@ -47,6 +51,40 @@ FString FCppAiAssistant::CleanGeneratedCode(const FString& RawResponse)
 	if (Code.EndsWith(TEXT("```")))
 	{
 		Code = Code.LeftChop(3).TrimEnd();
+	}
+
+	// Overlap check with Suffix:
+	// If the end of Code duplicates the start of Suffix, strip the duplicate from Code
+	if (!Suffix.IsEmpty() && !Code.IsEmpty())
+	{
+		FString TrimmedSuffix = Suffix.TrimStart();
+		int32 MaxCheck = FMath::Min(Code.Len(), FMath::Min(TrimmedSuffix.Len(), 120));
+		for (int32 MatchLen = MaxCheck; MatchLen >= 3; --MatchLen)
+		{
+			FString CodeTail = Code.Right(MatchLen);
+			if (TrimmedSuffix.StartsWith(CodeTail))
+			{
+				Code = Code.LeftChop(MatchLen);
+				break;
+			}
+		}
+	}
+
+	// Overlap check with Prefix:
+	// If the start of Code duplicates the end of Prefix, strip the duplicate from Code
+	if (!Prefix.IsEmpty() && !Code.IsEmpty())
+	{
+		FString TrimmedPrefix = Prefix.TrimEnd();
+		int32 MaxCheck = FMath::Min(Code.Len(), FMath::Min(TrimmedPrefix.Len(), 120));
+		for (int32 MatchLen = MaxCheck; MatchLen >= 3; --MatchLen)
+		{
+			FString CodeHead = Code.Left(MatchLen);
+			if (TrimmedPrefix.EndsWith(CodeHead))
+			{
+				Code = Code.Mid(MatchLen);
+				break;
+			}
+		}
 	}
 
 	return Code;
@@ -119,9 +157,14 @@ void FCppAiAssistant::RequestInlineCompletion(
 
 	// Construct system and user prompt for high-precision inline ghost text completion
 	FString SystemPrompt = TEXT(
-		"You are an expert C++20 and Unreal Engine 5.8 code completion engine.\n"
-		"Provide ONLY the continuation code that should be inserted directly at the cursor.\n"
-		"Do NOT repeat any code from before the cursor. Do NOT provide explanations or markdown fences. Output plain raw code only."
+		"You are a code completion engine for Unreal Engine 5.8 C++.\n"
+		"Provide ONLY the continuation code that should be inserted directly at <CURSOR>.\n"
+		"RULES:\n"
+		"1. Output ONLY raw code to insert.\n"
+		"2. Do NOT output markdown ticks (```).\n"
+		"3. Do NOT repeat code from before <CURSOR>.\n"
+		"4. Do NOT repeat code from after <CURSOR>.\n"
+		"5. Output valid, clean C++."
 	);
 
 	FString UserPrompt = FString::Printf(
@@ -161,7 +204,7 @@ void FCppAiAssistant::RequestInlineCompletion(
 	ActiveCompletionRequest = Request;
 
 	Request->OnProcessRequestComplete().BindLambda(
-		[this, InCallback](FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bConnectedSuccessfully)
+		[this, InCallback, CleanPrefix, CleanSuffix](FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bConnectedSuccessfully)
 		{
 			bIsRequestInFlight = false;
 			ActiveCompletionRequest.Reset();
@@ -188,7 +231,7 @@ void FCppAiAssistant::RequestInlineCompletion(
 						if (MessageObj.IsValid() && MessageObj->HasTypedField<EJson::String>(TEXT("content")))
 						{
 							FString RawContent = MessageObj->GetStringField(TEXT("content"));
-							FString CleanCode = CleanGeneratedCode(RawContent);
+							FString CleanCode = CleanGeneratedCode(RawContent, CleanPrefix, CleanSuffix);
 							InCallback.ExecuteIfBound(CleanCode, !CleanCode.IsEmpty());
 							return;
 						}
@@ -205,8 +248,7 @@ void FCppAiAssistant::RequestInlineCompletion(
 
 void FCppAiAssistant::SendChatMessage(
 	const FString& InUserMessage,
-	const FString& InCodeContext,
-	const FString& InErrorContext,
+	const FAiEditorContext& InContext,
 	FOnAiChatReceived InCallback)
 {
 	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
@@ -227,7 +269,7 @@ void FCppAiAssistant::SendChatMessage(
 	Request->SetURL(Endpoint);
 	Request->SetVerb(TEXT("POST"));
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	Request->SetTimeout(45.0f);
+	Request->SetTimeout(60.0f);
 
 	if (Settings.AiProvider == EAiProvider::GitHubCopilot || Endpoint.Contains(TEXT("githubcopilot.com")))
 	{
@@ -256,27 +298,41 @@ void FCppAiAssistant::SendChatMessage(
 	}
 
 	FString SystemPrompt = TEXT(
-		"You are C++ Studio AI Assistant, an elite Unreal Engine 5.8 and Slate UI framework expert.\n"
-		"You write production-grade, performant, modern C++20 and Slate code.\n"
-		"Always format code cleanly inside ```cpp ... ``` blocks.\n"
-		"Be concise, direct, helpful, and provide complete implementations without placeholders."
+		"You are C++ Studio AI Agent — an elite Unreal Engine 5.8 C++ pair-programming agent and Slate UI architect integrated inside Unreal Editor.\n"
+		"You have deep understanding of UE5 reflection (UCLASS, UPROPERTY, UFUNCTION), Slate declarative syntax (SNew, SAssignNew, ChildSlot), and performance best practices.\n\n"
+		"CRITICAL GUIDELINES:\n"
+		"1. When the user asks to write, modify, or refactor code, ALWAYS enclose code in ```cpp ... ``` blocks.\n"
+		"2. If proposing code to replace a selection or function, output the complete self-contained replacement block so the user can click 'Apply to File'.\n"
+		"3. If diagnosing a compile error, explain the exact cause in 1-2 sentences, then provide the full working code fix.\n"
+		"4. Structure your response using clean Markdown: headers (###), bold text, bullet points (-), and inline code (`type`)."
 	);
 
 	FString PromptContent;
-	if (!InErrorContext.IsEmpty())
+	if (!InContext.ActiveFilePath.IsEmpty())
 	{
-		PromptContent += FString::Printf(TEXT("Compiler Error:\n%s\n\n"), *InErrorContext);
+		PromptContent += FString::Printf(TEXT("Active File: %s\n"), *FPaths::GetCleanFilename(InContext.ActiveFilePath));
 	}
-	if (!InCodeContext.IsEmpty())
+	if (!InContext.SelectedText.IsEmpty())
 	{
-		PromptContent += FString::Printf(TEXT("Source Code Context:\n```cpp\n%s\n```\n\n"), *InCodeContext);
+		PromptContent += FString::Printf(TEXT("[Selected Code in Editor]:\n```cpp\n%s\n```\n\n"), *InContext.SelectedText);
+	}
+	else if (!InContext.ActiveFileContent.IsEmpty())
+	{
+		FString ScopedContent = InContext.ActiveFileContent.Len() > 8000
+			? InContext.ActiveFileContent.Left(8000) + TEXT("\n// ... [remaining content truncated]")
+			: InContext.ActiveFileContent;
+		PromptContent += FString::Printf(TEXT("[File Content]:\n```cpp\n%s\n```\n\n"), *ScopedContent);
+	}
+	if (!InContext.RecentCompilerErrors.IsEmpty())
+	{
+		PromptContent += FString::Printf(TEXT("[Recent Compiler Output / Errors]:\n%s\n\n"), *InContext.RecentCompilerErrors);
 	}
 	PromptContent += InUserMessage;
 
 	TSharedPtr<FJsonObject> RootObject = MakeShared<FJsonObject>();
 	RootObject->SetStringField(TEXT("model"), Settings.AiModel.IsEmpty() ? TEXT("deepseek-coder") : Settings.AiModel);
 	RootObject->SetNumberField(TEXT("temperature"), 0.3);
-	RootObject->SetNumberField(TEXT("max_tokens"), 2048);
+	RootObject->SetNumberField(TEXT("max_tokens"), 4096);
 
 	TArray<TSharedPtr<FJsonValue>> MessagesArray;
 
@@ -341,6 +397,18 @@ void FCppAiAssistant::SendChatMessage(
 	);
 
 	Request->ProcessRequest();
+}
+
+void FCppAiAssistant::SendChatMessage(
+	const FString& InUserMessage,
+	const FString& InCodeContext,
+	const FString& InErrorContext,
+	FOnAiChatReceived InCallback)
+{
+	FAiEditorContext Context;
+	Context.ActiveFileContent = InCodeContext;
+	Context.RecentCompilerErrors = InErrorContext;
+	SendChatMessage(InUserMessage, Context, InCallback);
 }
 
 void FCppAiAssistant::TestConnection(FOnAiTestResult InCallback)

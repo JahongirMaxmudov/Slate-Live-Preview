@@ -13,6 +13,17 @@ DECLARE_DELEGATE_TwoParams(FOnAiTestResult, bool /* bSuccess */, const FString& 
 DECLARE_DELEGATE_TwoParams(FOnGitHubDeviceCodeReceived, const FString& /* UserCode */, const FString& /* VerificationUri */);
 DECLARE_DELEGATE_TwoParams(FOnGitHubAuthComplete, bool /* bSuccess */, const FString& /* MessageOrUsername */);
 
+struct FAiEditorContext
+{
+	FString ActiveFilePath;
+	FString ActiveFileContent;
+	FString SelectedText;
+	int32 CursorLine = 1;
+	int32 CursorColumn = 1;
+	FString RecentCompilerErrors;
+	TArray<FString> OpenFiles;
+};
+
 /**
  * Universal AI Assistant & Copilot Client for C++ Studio.
  * Connects to Local Ollama, LM Studio, DeepSeek, OpenAI, GitHub Copilot, or any OpenAI-compatible API.
@@ -33,7 +44,16 @@ public:
 	);
 
 	/**
-	 * Send conversational message or code generation request.
+	 * Send conversational message or code generation request with full editor context.
+	 */
+	void SendChatMessage(
+		const FString& InUserMessage,
+		const FAiEditorContext& InContext,
+		FOnAiChatReceived InCallback
+	);
+
+	/**
+	 * Send conversational message (backward-compatible overload).
 	 */
 	void SendChatMessage(
 		const FString& InUserMessage,
@@ -84,5 +104,5 @@ private:
 	void PollGitHubDeviceToken(FOnGitHubAuthComplete OnComplete);
 	void FetchGitHubUsername(const FString& InAccessToken, TFunction<void(const FString&)> OnUsernameFetched);
 
-	static FString CleanGeneratedCode(const FString& RawResponse);
+	static FString CleanGeneratedCode(const FString& RawResponse, const FString& Prefix = TEXT(""), const FString& Suffix = TEXT(""));
 };

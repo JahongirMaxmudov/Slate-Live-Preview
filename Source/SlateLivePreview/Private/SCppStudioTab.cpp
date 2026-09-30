@@ -567,10 +567,13 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 
 					// Far Right: AI Assistant Drawer (Collapsible)
 					+ SSplitter::Slot()
-					.Value(0.25f)
+					.Value(0.35f)
+					.MinSize(380.0f)
 					[
 						SAssignNew(AiAssistantDrawer, SCppAiAssistantDrawer)
 						.OnInsertCodeToEditor(this, &SCppStudioTab::InsertCodeFromAi)
+						.OnApplyCodeToEditor(this, &SCppStudioTab::ApplyCodeFromAi)
+						.OnGetEditorContext(this, &SCppStudioTab::GetActiveEditorContext)
 						.OnCloseRequested_Lambda([this]()
 						{
 							ToggleAiDrawer(false);
@@ -1336,6 +1339,64 @@ void SCppStudioTab::InsertCodeFromAi(const FString& Code)
 		ActivePane->InsertCodeAtCursor(Code);
 		ActivePane->FocusEditor();
 	}
+}
+
+void SCppStudioTab::ApplyCodeFromAi(const FString& Code)
+{
+	TSharedPtr<SCppEditorPane> ActivePane = ActiveEditorPane.Pin();
+	if (!ActivePane.IsValid())
+	{
+		ActivePane = LeftEditorPane;
+	}
+	if (ActivePane.IsValid())
+	{
+		ActivePane->ApplyAiCodeChange(Code);
+		ActivePane->FocusEditor();
+	}
+}
+
+FAiEditorContext SCppStudioTab::GetActiveEditorContext() const
+{
+	FAiEditorContext Ctx;
+	TSharedPtr<SCppEditorPane> ActivePane = ActiveEditorPane.Pin();
+	if (!ActivePane.IsValid())
+	{
+		ActivePane = LeftEditorPane;
+	}
+	if (ActivePane.IsValid())
+	{
+		Ctx.ActiveFilePath = ActivePane->GetActiveFilePath();
+		Ctx.ActiveFileContent = ActivePane->GetActiveContent();
+		Ctx.SelectedText = ActivePane->GetSelectedText();
+		Ctx.CursorLine = ActivePane->GetCurrentLineIndex() + 1;
+		Ctx.CursorColumn = ActivePane->GetCurrentColumnIndex() + 1;
+	}
+	Ctx.RecentCompilerErrors = GetRecentCompilerErrors();
+	return Ctx;
+}
+
+FString SCppStudioTab::GetRecentCompilerErrors() const
+{
+	if (OutputConsoleAccumulator.IsEmpty())
+	{
+		return FString();
+	}
+
+	TArray<FString> LogLines;
+	OutputConsoleAccumulator.ParseIntoArrayLines(LogLines, false);
+
+	FString Errors;
+	for (int32 i = FMath::Max(0, LogLines.Num() - 30); i < LogLines.Num(); ++i)
+	{
+		const FString& Line = LogLines[i];
+		if (Line.Contains(TEXT("error"), ESearchCase::IgnoreCase) ||
+			Line.Contains(TEXT("failed"), ESearchCase::IgnoreCase) ||
+			Line.Contains(TEXT("warning"), ESearchCase::IgnoreCase))
+		{
+			Errors += Line + TEXT("\n");
+		}
+	}
+	return Errors.TrimEnd();
 }
 
 void SCppStudioTab::OpenNewClassWizard()

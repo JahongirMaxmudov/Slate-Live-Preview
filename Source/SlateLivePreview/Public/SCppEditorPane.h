@@ -109,7 +109,9 @@ public:
 	int32 GetCurrentColumnIndex() const;
 
 	void InsertCodeAtCursor(const FString& InCode);
-	bool HasGhostText() const { return bGhostTextVisible && !ActiveGhostText.IsEmpty(); }
+	void ApplyAiCodeChange(const FString& NewCode);
+	FString GetSelectedText() const;
+	bool HasGhostText() const;
 	FString GetActiveGhostText() const { return ActiveGhostText; }
 	FTextLocation GetGhostTextLocation() const { return GhostTextLocation; }
 

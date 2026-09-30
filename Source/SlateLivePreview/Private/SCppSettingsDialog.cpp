@@ -1227,10 +1227,6 @@ FReply SCppSettingsDialog::OnCopyUserCodeClicked()
 		Info.bFireAndForget = true;
 		FSlateNotificationManager::Get().AddNotification(Info);
 	}
-	if (!ActiveGitHubVerificationUri.IsEmpty())
-	{
-		FPlatformProcess::LaunchURL(*ActiveGitHubVerificationUri, nullptr, nullptr);
-	}
 	return FReply::Handled();
 }
 

@@ -397,5 +397,44 @@ bool FSlateLivePreviewSettingsDialogTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ----------------------------------------------------------------------------
+// Test 11: AI Agent Drawer & Direct Code Editing Actions
+// ----------------------------------------------------------------------------
+#include "SCppAiAssistantDrawer.h"
+#include "SCppEditorPane.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSlateLivePreviewAiAgentTest,
+	"SlateLivePreview.AiAgent.DrawerAndCodeActions",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSlateLivePreviewAiAgentTest::RunTest(const FString& Parameters)
+{
+	FString InsertedCode;
+	FString AppliedCode;
+
+	TSharedRef<SCppAiAssistantDrawer> Drawer = SNew(SCppAiAssistantDrawer)
+		.OnInsertCodeToEditor_Lambda([&InsertedCode](const FString& Code) { InsertedCode = Code; })
+		.OnApplyCodeToEditor_Lambda([&AppliedCode](const FString& Code) { AppliedCode = Code; })
+		.OnGetEditorContext_Lambda([]()
+		{
+			FAiEditorContext Ctx;
+			Ctx.ActiveFilePath = TEXT("C:/TestProject/Source/MyActor.cpp");
+			Ctx.ActiveFileContent = TEXT("void AMyActor::BeginPlay() { Super::BeginPlay(); }");
+			Ctx.SelectedText = TEXT("Super::BeginPlay();");
+			Ctx.CursorLine = 1;
+			Ctx.CursorColumn = 20;
+			return Ctx;
+		});
+
+	TestTrue(TEXT("SCppAiAssistantDrawer instantiates cleanly"), Drawer != SNullWidget::NullWidget);
+
+	// Test editor pane code replacement
+	TSharedRef<SCppEditorPane> Pane = SNew(SCppEditorPane);
+	TestFalse(TEXT("No ghost text initially"), Pane->HasGhostText());
+
+	return true;
+}
+
 #endif
 

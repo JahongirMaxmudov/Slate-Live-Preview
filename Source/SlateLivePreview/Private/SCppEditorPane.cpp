@@ -253,28 +253,91 @@ public:
 			GhostLines.Add(GhostText);
 		}
 
-		const FLinearColor GhostColor(0.52f, 0.55f, 0.62f, 0.70f);
+		const FLinearColor GhostColor(0.55f, 0.58f, 0.68f, 0.85f);
 
-		for (int32 i = 0; i < GhostLines.Num(); ++i)
+		// Line 0 is drawn inline right after the cursor
+		FString GhostFirstLine = GhostLines[0];
+		GhostFirstLine.ReplaceInline(TEXT("\t"), TEXT("    "));
+		FSlateDrawElement::MakeText(
+			OutDrawElements,
+			LayerId + 5,
+			AllottedGeometry.ToPaintGeometry(FVector2f(AllottedGeometry.GetLocalSize().X - StartX, LineHeight), FSlateLayoutTransform(FVector2f(StartX, Y))),
+			GhostFirstLine,
+			FontInfo,
+			ESlateDrawEffect::None,
+			GhostColor
+		);
+
+		// If there are multiple lines (lines 1..N):
+		// Draw a sleek floating suggestion card with solid dark background so it NEVER overlaps existing text!
+		if (GhostLines.Num() > 1)
 		{
-			float LineY = Y + i * LineHeight;
-			if (LineY + LineHeight > Height)
-			{
-				break;
-			}
-			float LineX = (i == 0) ? StartX : 4.0f;
-			FString DisplayLine = GhostLines[i];
-			DisplayLine.ReplaceInline(TEXT("\t"), TEXT("    "));
+			float CardY = Y + LineHeight + 2.0f;
+			float CardX = FMath::Clamp(StartX - 16.0f, 4.0f, FMath::Max(4.0f, AllottedGeometry.GetLocalSize().X - 320.0f));
 
+			float MaxLineWidth = 0.0f;
+			for (int32 i = 1; i < GhostLines.Num(); ++i)
+			{
+				FString CleanLine = GhostLines[i];
+				CleanLine.ReplaceInline(TEXT("\t"), TEXT("    "));
+				float LW = (float)FontMeasure->Measure(CleanLine, FontInfo).X;
+				if (LW > MaxLineWidth) MaxLineWidth = LW;
+			}
+			float CardWidth = FMath::Clamp(MaxLineWidth + 32.0f, 260.0f, FMath::Max(260.0f, AllottedGeometry.GetLocalSize().X - CardX - 8.0f));
+			float CardHeight = (GhostLines.Num() - 1) * LineHeight + 26.0f;
+
+			// 1. Drop shadow / background box
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				LayerId + 6,
+				AllottedGeometry.ToPaintGeometry(FVector2f(CardWidth, CardHeight), FSlateLayoutTransform(FVector2f(CardX, CardY))),
+				FAppStyle::Get().GetBrush("ToolPanel.DarkGroupBorder"),
+				ESlateDrawEffect::None,
+				FLinearColor(0.10f, 0.11f, 0.15f, 0.98f)
+			);
+
+			// 2. Cyan subtle top border
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				LayerId + 7,
+				AllottedGeometry.ToPaintGeometry(FVector2f(CardWidth, 2.0f), FSlateLayoutTransform(FVector2f(CardX, CardY))),
+				FAppStyle::Get().GetBrush("WhiteBrush"),
+				ESlateDrawEffect::None,
+				FLinearColor(0.2f, 0.6f, 1.0f, 0.9f)
+			);
+
+			// 3. Header badge: [Tab] Accept (N lines) · [Esc] Dismiss
+			FString BadgeText = FString::Printf(TEXT("  [Tab] Accept (%d lines)  ·  [Esc] Dismiss"), GhostLines.Num());
+			FSlateFontInfo BadgeFont = FCoreStyle::GetDefaultFontStyle("Bold", 8.0f);
 			FSlateDrawElement::MakeText(
 				OutDrawElements,
-				LayerId + 5,
-				AllottedGeometry.ToPaintGeometry(FVector2f(AllottedGeometry.GetLocalSize().X - LineX, LineHeight), FSlateLayoutTransform(FVector2f(LineX, LineY))),
-				DisplayLine,
-				FontInfo,
+				LayerId + 8,
+				AllottedGeometry.ToPaintGeometry(FVector2f(CardWidth, 16.0f), FSlateLayoutTransform(FVector2f(CardX + 4.0f, CardY + 4.0f))),
+				BadgeText,
+				BadgeFont,
 				ESlateDrawEffect::None,
-				GhostColor
+				FLinearColor(0.35f, 0.75f, 1.0f, 0.95f)
 			);
+
+			// 4. Lines 1..N
+			for (int32 i = 1; i < GhostLines.Num(); ++i)
+			{
+				float LinePosY = CardY + 20.0f + (i - 1) * LineHeight;
+				FString DisplayLine = GhostLines[i];
+				DisplayLine.ReplaceInline(TEXT("\t"), TEXT("    "));
+
+				FSlateDrawElement::MakeText(
+					OutDrawElements,
+					LayerId + 8,
+					AllottedGeometry.ToPaintGeometry(FVector2f(CardWidth - 12.0f, LineHeight), FSlateLayoutTransform(FVector2f(CardX + 8.0f, LinePosY))),
+					DisplayLine,
+					FontInfo,
+					ESlateDrawEffect::None,
+					FLinearColor(0.85f, 0.88f, 0.92f, 0.95f)
+				);
+			}
+
+			return LayerId + 9;
 		}
 
 		return LayerId + 6;
@@ -1989,6 +2052,7 @@ void SCppEditorPane::Log(const FString& Message)
 
 FReply SCppEditorPane::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
+	DismissGhostText();
 	DismissHoverDoc();
 	FocusEditor();
 	return FReply::Unhandled();
@@ -5241,6 +5305,15 @@ void SCppEditorPane::Tick(const FGeometry& AllottedGeometry, const double InCurr
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 
+	// Check if cursor has moved away from GhostTextLocation
+	if (bGhostTextVisible)
+	{
+		if (!CodeTextBox.IsValid() || CodeTextBox->GetCursorLocation() != GhostTextLocation)
+		{
+			DismissGhostText();
+		}
+	}
+
 	// Debounce AI Copilot Inline Completion
 	if (bPendingAiRequest)
 	{
@@ -5411,6 +5484,24 @@ void SCppEditorPane::OnAiCompletionReceived(const FString& CompletionText, bool 
 	bGhostTextVisible = true;
 }
 
+bool SCppEditorPane::HasGhostText() const
+{
+	if (!bGhostTextVisible || ActiveGhostText.IsEmpty() || !CodeTextBox.IsValid())
+	{
+		return false;
+	}
+	return CodeTextBox->GetCursorLocation() == GhostTextLocation;
+}
+
+FString SCppEditorPane::GetSelectedText() const
+{
+	if (CodeTextBox.IsValid() && CodeTextBox->AnyTextSelected())
+	{
+		return CodeTextBox->GetSelectedText().ToString();
+	}
+	return FString();
+}
+
 void SCppEditorPane::CommitGhostText()
 {
 	if (HasGhostText() && CodeTextBox.IsValid())
@@ -5434,6 +5525,98 @@ void SCppEditorPane::InsertCodeAtCursor(const FString& InCode)
 	{
 		DismissGhostText();
 		CodeTextBox->InsertTextAtCursor(InCode);
+	}
+}
+
+void SCppEditorPane::ApplyAiCodeChange(const FString& NewCode)
+{
+	if (ActiveDocumentIndex < 0 || ActiveDocumentIndex >= OpenDocuments.Num() || !CodeTextBox.IsValid() || NewCode.IsEmpty())
+	{
+		return;
+	}
+
+	DismissGhostText();
+	TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+	Doc->UndoHistory.Push(Doc->CurrentContent);
+	Doc->RedoHistory.Empty();
+
+	if (CodeTextBox->AnyTextSelected())
+	{
+		// Replace selected code directly
+		CodeTextBox->InsertTextAtCursor(NewCode);
+	}
+	else
+	{
+		// Check if NewCode represents an entire file replacement
+		if (NewCode.Contains(TEXT("#pragma once")) || (NewCode.Contains(TEXT("#include")) && (NewCode.Contains(TEXT("class ")) || NewCode.Contains(TEXT("struct ")))))
+		{
+			Doc->CurrentContent = NewCode;
+			Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+			Doc->bIsInternalTextChange = true;
+			CodeTextBox->SetText(FText::FromString(NewCode));
+			Doc->bIsInternalTextChange = false;
+			RebuildTabStrip();
+			OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+		}
+		else
+		{
+			// Check if NewCode contains a function signature matching a function in Doc
+			int32 OpenParen = NewCode.Find(TEXT("("));
+			bool bReplacedFunction = false;
+			if (OpenParen != INDEX_NONE)
+			{
+				FString FuncSigPrefix = NewCode.Left(OpenParen).TrimStartAndEnd();
+				int32 SpaceIdx = FuncSigPrefix.Find(TEXT(" "), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+				FString FuncIdentifier = (SpaceIdx != INDEX_NONE) ? FuncSigPrefix.Mid(SpaceIdx + 1).TrimStartAndEnd() : FuncSigPrefix;
+				if (!FuncIdentifier.IsEmpty())
+				{
+					int32 FoundInDoc = Doc->CurrentContent.Find(FuncIdentifier);
+					if (FoundInDoc != INDEX_NONE)
+					{
+						int32 DocBraceOpen = Doc->CurrentContent.Find(TEXT("{"), ESearchCase::IgnoreCase, ESearchDir::FromStart, FoundInDoc);
+						if (DocBraceOpen != INDEX_NONE)
+						{
+							int32 BraceDepth = 1;
+							int32 DocBraceClose = INDEX_NONE;
+							for (int32 b = DocBraceOpen + 1; b < Doc->CurrentContent.Len(); ++b)
+							{
+								if (Doc->CurrentContent[b] == TEXT('{')) BraceDepth++;
+								else if (Doc->CurrentContent[b] == TEXT('}'))
+								{
+									BraceDepth--;
+									if (BraceDepth == 0)
+									{
+										DocBraceClose = b;
+										break;
+									}
+								}
+							}
+							if (DocBraceClose != INDEX_NONE)
+							{
+								int32 LineStart = Doc->CurrentContent.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromEnd, FoundInDoc);
+								LineStart = (LineStart == INDEX_NONE) ? 0 : LineStart + 1;
+
+								FString UpdatedContent = Doc->CurrentContent.Left(LineStart) + NewCode + Doc->CurrentContent.Mid(DocBraceClose + 1);
+								Doc->CurrentContent = UpdatedContent;
+								Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+								Doc->bIsInternalTextChange = true;
+								CodeTextBox->SetText(FText::FromString(UpdatedContent));
+								Doc->bIsInternalTextChange = false;
+								RebuildTabStrip();
+								OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+								bReplacedFunction = true;
+							}
+						}
+					}
+				}
+			}
+
+			if (!bReplacedFunction)
+			{
+				// Fallback: Insert at current cursor
+				CodeTextBox->InsertTextAtCursor(NewCode);
+			}
+		}
 	}
 }
 

@@ -8,6 +8,7 @@
 #include "SCppProjectTree.h"
 #include "SCppEditorPane.h"
 #include "SSlateLivePreviewViewport.h"
+#include "CppAiAssistant.h"
 
 class SMultiLineEditableTextBox;
 class STextBlock;
@@ -110,6 +111,9 @@ private:
 	FReply OnToggleAiDrawerClicked();
 	void ToggleAiDrawer(bool bShow);
 	void InsertCodeFromAi(const FString& Code);
+	void ApplyCodeFromAi(const FString& Code);
+	FAiEditorContext GetActiveEditorContext() const;
+	FString GetRecentCompilerErrors() const;
 	FReply OnNewClassClicked();
 	FReply OnQuickOpenClicked();
 	FReply OnSettingsClicked();
