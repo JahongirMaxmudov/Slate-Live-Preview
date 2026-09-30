@@ -34,6 +34,11 @@ FString FCppAiAssistant::CleanGeneratedCode(const FString& RawResponse, const FS
 {
 	FString Code = RawResponse.TrimStartAndEnd();
 
+	if (Code.StartsWith(TEXT("<REPLACE_LINE>")))
+	{
+		return Code;
+	}
+
 	// Strip markdown code block fences if present
 	if (Code.StartsWith(TEXT("```cpp")))
 	{
@@ -158,13 +163,12 @@ void FCppAiAssistant::RequestInlineCompletion(
 	// Construct system and user prompt for high-precision inline ghost text completion
 	FString SystemPrompt = TEXT(
 		"You are a code completion engine for Unreal Engine 5.8 C++.\n"
-		"Provide ONLY the continuation code that should be inserted directly at <CURSOR>.\n"
+		"Provide the continuation code that should be inserted directly at <CURSOR>.\n"
 		"RULES:\n"
-		"1. Output ONLY raw code to insert.\n"
-		"2. Do NOT output markdown ticks (```).\n"
-		"3. Do NOT repeat code from before <CURSOR>.\n"
-		"4. Do NOT repeat code from after <CURSOR>.\n"
-		"5. Output valid, clean C++."
+		"1. Output ONLY raw code to insert (no markdown backticks ```).\n"
+		"2. If the current line before <CURSOR> ends in a placeholder (such as %%, TODO, ??), or has a syntax error that needs full line replacement, start your output with '<REPLACE_LINE>' followed by the complete, correct, valid C++ line.\n"
+		"3. Otherwise, output ONLY continuation code to insert at <CURSOR> without repeating prefix or suffix.\n"
+		"4. Output valid, clean Unreal Engine C++."
 	);
 
 	FString UserPrompt = FString::Printf(

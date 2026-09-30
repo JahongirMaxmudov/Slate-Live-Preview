@@ -412,10 +412,15 @@ bool FSlateLivePreviewAiAgentTest::RunTest(const FString& Parameters)
 {
 	FString InsertedCode;
 	FString AppliedCode;
+	FString AppliedTargetFile;
 
 	TSharedRef<SCppAiAssistantDrawer> Drawer = SNew(SCppAiAssistantDrawer)
 		.OnInsertCodeToEditor_Lambda([&InsertedCode](const FString& Code) { InsertedCode = Code; })
-		.OnApplyCodeToEditor_Lambda([&AppliedCode](const FString& Code) { AppliedCode = Code; })
+		.OnApplyCodeToEditor_Lambda([&AppliedCode, &AppliedTargetFile](const FString& Code, const FString& TargetFile)
+		{
+			AppliedCode = Code;
+			AppliedTargetFile = TargetFile;
+		})
 		.OnGetEditorContext_Lambda([]()
 		{
 			FAiEditorContext Ctx;
@@ -429,9 +434,15 @@ bool FSlateLivePreviewAiAgentTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("SCppAiAssistantDrawer instantiates cleanly"), Drawer != SNullWidget::NullWidget);
 
+	// Test sessions and permission modes
+	Drawer->SetPermissionMode(EAiPermissionMode::AutoApply);
+	TestTrue(TEXT("Permission mode can be set to AutoApply"), Drawer->GetPermissionMode() == EAiPermissionMode::AutoApply);
+	Drawer->StartNewSession();
+
 	// Test editor pane code replacement
 	TSharedRef<SCppEditorPane> Pane = SNew(SCppEditorPane);
 	TestFalse(TEXT("No ghost text initially"), Pane->HasGhostText());
+	TestFalse(TEXT("No line replacement active initially"), Pane->IsGhostTextLineReplacement());
 
 	return true;
 }

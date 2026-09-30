@@ -111,7 +111,7 @@ private:
 	FReply OnToggleAiDrawerClicked();
 	void ToggleAiDrawer(bool bShow);
 	void InsertCodeFromAi(const FString& Code);
-	void ApplyCodeFromAi(const FString& Code);
+	void ApplyCodeFromAi(const FString& Code, const FString& TargetFileName = TEXT(""));
 	FAiEditorContext GetActiveEditorContext() const;
 	FString GetRecentCompilerErrors() const;
 	FReply OnNewClassClicked();

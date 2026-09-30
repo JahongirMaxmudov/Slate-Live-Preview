@@ -94,6 +94,8 @@ public:
 
 	FString GetActiveFilePath() const;
 	FString GetActiveContent() const;
+	TArray<FString> GetOpenDocumentFilePaths() const;
+	FString GetLineText(int32 LineIndex) const;
 	bool HasOpenFiles() const { return OpenDocuments.Num() > 0; }
 	bool IsCurrentDirty() const;
 
@@ -112,6 +114,7 @@ public:
 	void ApplyAiCodeChange(const FString& NewCode);
 	FString GetSelectedText() const;
 	bool HasGhostText() const;
+	bool IsGhostTextLineReplacement() const { return bGhostTextReplacesLine; }
 	FString GetActiveGhostText() const { return ActiveGhostText; }
 	FTextLocation GetGhostTextLocation() const { return GhostTextLocation; }
 
@@ -153,6 +156,8 @@ private:
 	FString ActiveGhostText;
 	FTextLocation GhostTextLocation;
 	bool bGhostTextVisible = false;
+	bool bGhostTextReplacesLine = false;
+	int32 GhostTextReplaceLineIndex = INDEX_NONE;
 	double LastKeyStrokeTime = 0.0;
 	bool bPendingAiRequest = false;
 

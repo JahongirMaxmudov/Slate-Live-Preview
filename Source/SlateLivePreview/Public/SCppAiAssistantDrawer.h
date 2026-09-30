@@ -8,8 +8,14 @@
 #include "CppAiAssistant.h"
 
 DECLARE_DELEGATE_OneParam(FOnInsertCodeToEditor, const FString& /* CodeToInsert */);
-DECLARE_DELEGATE_OneParam(FOnApplyCodeToEditor, const FString& /* CodeToApply */);
+DECLARE_DELEGATE_TwoParams(FOnApplyCodeToEditor, const FString& /* CodeToApply */, const FString& /* TargetFileName */);
 DECLARE_DELEGATE_RetVal(FAiEditorContext, FOnGetEditorContext);
+
+enum class EAiPermissionMode : uint8
+{
+	AskBeforeApply = 0,
+	AutoApply
+};
 
 struct FAiChatMessage
 {
@@ -18,6 +24,16 @@ struct FAiChatMessage
 	FDateTime Timestamp;
 };
 
+struct FAiChatSession
+{
+	FGuid SessionId;
+	FString Title;
+	TArray<TSharedPtr<FAiChatMessage>> Messages;
+	FDateTime CreatedAt;
+};
+
+template<typename OptionType>
+class SComboBox;
 class SScrollBox;
 class SMultiLineEditableTextBox;
 class STextBlock;
@@ -50,25 +66,56 @@ public:
 	/** Focuses user input */
 	void FocusInput();
 
+	/** Starts a new chat session */
+	void StartNewSession();
+
+	/** Switches to a chat session by index */
+	void SwitchSession(int32 NewIndex);
+
+	/** Gets current permission mode */
+	EAiPermissionMode GetPermissionMode() const { return PermissionMode; }
+	void SetPermissionMode(EAiPermissionMode NewMode);
+
 private:
 	FOnInsertCodeToEditor OnInsertCodeToEditor;
 	FOnApplyCodeToEditor OnApplyCodeToEditor;
 	FOnGetEditorContext OnGetEditorContext;
 	FSimpleDelegate OnCloseRequested;
 
-	TArray<TSharedPtr<FAiChatMessage>> ChatHistory;
+	// Chat Sessions
+	TArray<TSharedPtr<FAiChatSession>> Sessions;
+	int32 ActiveSessionIndex = 0;
+	EAiPermissionMode PermissionMode = EAiPermissionMode::AskBeforeApply;
+
+	// UI Controls
 	TSharedPtr<SScrollBox> ChatScrollBox;
 	TSharedPtr<SMultiLineEditableTextBox> PromptInputBox;
 	TSharedPtr<STextBlock> StatusIndicatorText;
 	TSharedPtr<STextBlock> ContextBadgeText;
+	TSharedPtr<STextBlock> PermissionButtonText;
+	TSharedPtr<STextBlock> QuotaIndicatorText;
+
+	TSharedPtr<SComboBox<TSharedPtr<FString>>> SessionComboBox;
+	TArray<TSharedPtr<FString>> SessionTitleOptions;
+
+	TSharedPtr<SComboBox<TSharedPtr<FString>>> ModelComboBox;
+	TArray<TSharedPtr<FString>> ModelOptions;
 
 	bool bIsThinking = false;
+	int32 SessionRequestCount = 0;
 
 	void SendCurrentPrompt();
 	void AppendMessage(bool bIsUser, const FString& Content);
 	void RebuildChatMessages();
+	void RefreshSessionOptions();
+	void AutoApplyCodeBlocksFromMessage(const FString& MessageText);
+
+	TArray<TSharedPtr<FAiChatMessage>>& GetActiveMessages();
+	const TArray<TSharedPtr<FAiChatMessage>>& GetActiveMessages() const;
+
 	TSharedRef<SWidget> CreateMessageWidget(const TSharedPtr<FAiChatMessage>& Message);
 	TSharedRef<SWidget> BuildMarkdownWidget(const FString& MarkdownText);
 	FReply HandlePromptInputKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
 	void UpdateContextBadge();
+	void UpdateQuotaDisplay();
 };

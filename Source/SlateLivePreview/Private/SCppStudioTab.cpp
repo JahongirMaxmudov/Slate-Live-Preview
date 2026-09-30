@@ -1341,17 +1341,106 @@ void SCppStudioTab::InsertCodeFromAi(const FString& Code)
 	}
 }
 
-void SCppStudioTab::ApplyCodeFromAi(const FString& Code)
+void SCppStudioTab::ApplyCodeFromAi(const FString& Code, const FString& TargetFileName)
 {
-	TSharedPtr<SCppEditorPane> ActivePane = ActiveEditorPane.Pin();
-	if (!ActivePane.IsValid())
+	TSharedPtr<SCppEditorPane> TargetPane = ActiveEditorPane.Pin();
+	if (!TargetPane.IsValid())
 	{
-		ActivePane = LeftEditorPane;
+		TargetPane = LeftEditorPane;
 	}
-	if (ActivePane.IsValid())
+
+	if (!TargetFileName.IsEmpty())
 	{
-		ActivePane->ApplyAiCodeChange(Code);
-		ActivePane->FocusEditor();
+		// 1. Check if TargetFileName is currently open in LeftEditorPane or RightEditorPane
+		TSharedPtr<SCppEditorPane> FoundPane;
+		auto CheckPaneForDoc = [&TargetFileName](TSharedPtr<SCppEditorPane> Pane) -> bool
+		{
+			if (!Pane.IsValid()) return false;
+			for (const FString& OpenPath : Pane->GetOpenDocumentFilePaths())
+			{
+				if (FPaths::GetCleanFilename(OpenPath).Equals(TargetFileName, ESearchCase::IgnoreCase))
+				{
+					Pane->OpenFile(OpenPath);
+					return true;
+				}
+			}
+			return false;
+		};
+
+		if (CheckPaneForDoc(LeftEditorPane))
+		{
+			FoundPane = LeftEditorPane;
+		}
+		else if (CheckPaneForDoc(RightEditorPane))
+		{
+			FoundPane = RightEditorPane;
+		}
+
+		if (FoundPane.IsValid())
+		{
+			TargetPane = FoundPane;
+			ActiveEditorPane = TargetPane;
+			TargetPane->FocusEditor();
+		}
+		else
+		{
+			// 2. Not currently open: search project files
+			FString FoundPathOnDisk;
+			for (const TSharedPtr<FString>& ProjFile : AllProjectFiles)
+			{
+				if (ProjFile.IsValid() && FPaths::GetCleanFilename(*ProjFile).Equals(TargetFileName, ESearchCase::IgnoreCase))
+				{
+					FoundPathOnDisk = *ProjFile;
+					break;
+				}
+			}
+
+			// 3. Fallback: Check sibling directory or Public/Private pairing of active file
+			if (FoundPathOnDisk.IsEmpty() && TargetPane.IsValid())
+			{
+				FString ActivePath = TargetPane->GetActiveFilePath();
+				if (!ActivePath.IsEmpty())
+				{
+					FString SiblingPath = FPaths::Combine(FPaths::GetPath(ActivePath), TargetFileName);
+					if (IFileManager::Get().FileExists(*SiblingPath))
+					{
+						FoundPathOnDisk = SiblingPath;
+					}
+					else
+					{
+						FString PairedPath = ActivePath.Replace(TEXT("/Private/"), TEXT("/Public/")).Replace(TEXT("\\Private\\"), TEXT("\\Public\\"));
+						PairedPath = FPaths::Combine(FPaths::GetPath(PairedPath), TargetFileName);
+						if (IFileManager::Get().FileExists(*PairedPath))
+						{
+							FoundPathOnDisk = PairedPath;
+						}
+						else
+						{
+							FString RevPaired = ActivePath.Replace(TEXT("/Public/"), TEXT("/Private/")).Replace(TEXT("\\Public\\"), TEXT("\\Private\\"));
+							RevPaired = FPaths::Combine(FPaths::GetPath(RevPaired), TargetFileName);
+							if (IFileManager::Get().FileExists(*RevPaired))
+							{
+								FoundPathOnDisk = RevPaired;
+							}
+						}
+					}
+				}
+			}
+
+			if (!FoundPathOnDisk.IsEmpty())
+			{
+				OpenFile(FoundPathOnDisk);
+				TargetPane = ActiveEditorPane.Pin();
+			}
+		}
+	}
+
+	if (TargetPane.IsValid())
+	{
+		TargetPane->ApplyAiCodeChange(Code);
+		TargetPane->FocusEditor();
+		UpdateFileHeader();
+		UpdateSlatePreviewIfApplicable();
 	}
 }
 

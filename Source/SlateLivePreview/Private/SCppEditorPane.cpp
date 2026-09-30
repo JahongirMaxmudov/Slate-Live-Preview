@@ -28,6 +28,8 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "Rendering/DrawElements.h"
 #include "Framework/Text/SlateTextLayout.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 class SCppEditorGutter : public SCompoundWidget
 {
@@ -254,6 +256,39 @@ public:
 		}
 
 		const FLinearColor GhostColor(0.55f, 0.58f, 0.68f, 0.85f);
+
+		if (OwnerPane->IsGhostTextLineReplacement())
+		{
+			// Line Replacement mode: draw a sleek badge and preview of the replaced line
+			FString ReplacementPreview = TEXT("💡 [Tab] Replace line: ") + GhostText.TrimStartAndEnd();
+			ReplacementPreview.ReplaceInline(TEXT("\t"), TEXT("    "));
+			float PreviewWidth = (float)FontMeasure->Measure(ReplacementPreview, FontInfo).X + 16.0f;
+			float PreviewHeight = LineHeight + 4.0f;
+			float PreviewY = Y + LineHeight + 2.0f;
+			float PreviewX = 8.0f;
+
+			// Background Box
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				LayerId + 5,
+				AllottedGeometry.ToPaintGeometry(FVector2f(FMath::Max(320.0f, PreviewWidth), PreviewHeight), FSlateLayoutTransform(FVector2f(PreviewX, PreviewY))),
+				FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"),
+				ESlateDrawEffect::None,
+				FLinearColor(0.08f, 0.15f, 0.25f, 0.95f)
+			);
+
+			// Text
+			FSlateDrawElement::MakeText(
+				OutDrawElements,
+				LayerId + 6,
+				AllottedGeometry.ToPaintGeometry(FVector2f(FMath::Max(320.0f, PreviewWidth), LineHeight), FSlateLayoutTransform(FVector2f(PreviewX + 8.0f, PreviewY + 2.0f))),
+				ReplacementPreview,
+				FontInfo,
+				ESlateDrawEffect::None,
+				FLinearColor(0.35f, 0.85f, 1.0f, 1.0f)
+			);
+			return LayerId + 6;
+		}
 
 		// Line 0 is drawn inline right after the cursor
 		FString GhostFirstLine = GhostLines[0];
@@ -1768,6 +1803,33 @@ FString SCppEditorPane::GetActiveContent() const
 	if (ActiveDocumentIndex >= 0 && ActiveDocumentIndex < OpenDocuments.Num())
 	{
 		return OpenDocuments[ActiveDocumentIndex]->CurrentContent;
+	}
+	return FString();
+}
+
+TArray<FString> SCppEditorPane::GetOpenDocumentFilePaths() const
+{
+	TArray<FString> Paths;
+	for (const TSharedPtr<FEditorDocument>& Doc : OpenDocuments)
+	{
+		if (Doc.IsValid() && !Doc->FilePath.IsEmpty())
+		{
+			Paths.Add(Doc->FilePath);
+		}
+	}
+	return Paths;
+}
+
+FString SCppEditorPane::GetLineText(int32 LineIndex) const
+{
+	if (ActiveDocumentIndex >= 0 && ActiveDocumentIndex < OpenDocuments.Num() && LineIndex >= 0)
+	{
+		TArray<FString> Lines;
+		OpenDocuments[ActiveDocumentIndex]->CurrentContent.ParseIntoArrayLines(Lines, false);
+		if (LineIndex < Lines.Num())
+		{
+			return Lines[LineIndex];
+		}
 	}
 	return FString();
 }
@@ -5479,7 +5541,40 @@ void SCppEditorPane::OnAiCompletionReceived(const FString& CompletionText, bool 
 		return;
 	}
 
-	ActiveGhostText = CompletionText;
+	if (CompletionText.StartsWith(TEXT("<REPLACE_LINE>")))
+	{
+		bGhostTextReplacesLine = true;
+		GhostTextReplaceLineIndex = OriginalCursorLoc.GetLineIndex();
+		ActiveGhostText = CompletionText.Mid(14).TrimStartAndEnd();
+	}
+	else
+	{
+		FString LineText = GetLineText(OriginalCursorLoc.GetLineIndex());
+		if (LineText.Contains(TEXT("%%")) || LineText.Contains(TEXT("/*TODO*/")) || LineText.Contains(TEXT("???")))
+		{
+			bGhostTextReplacesLine = true;
+			GhostTextReplaceLineIndex = OriginalCursorLoc.GetLineIndex();
+			if (CompletionText.Contains(TEXT("=")))
+			{
+				ActiveGhostText = CompletionText.TrimStartAndEnd();
+			}
+			else if (CompletionText.Contains(TEXT(";")))
+			{
+				ActiveGhostText = LineText.Replace(TEXT("%%"), TEXT("")).TrimEnd() + TEXT(" ") + CompletionText.TrimStartAndEnd();
+			}
+			else
+			{
+				ActiveGhostText = LineText.Replace(TEXT("%%"), *CompletionText);
+			}
+		}
+		else
+		{
+			bGhostTextReplacesLine = false;
+			GhostTextReplaceLineIndex = INDEX_NONE;
+			ActiveGhostText = CompletionText;
+		}
+	}
+
 	GhostTextLocation = OriginalCursorLoc;
 	bGhostTextVisible = true;
 }
@@ -5507,7 +5602,38 @@ void SCppEditorPane::CommitGhostText()
 	if (HasGhostText() && CodeTextBox.IsValid())
 	{
 		FString TextToInsert = ActiveGhostText;
+		bool bReplaceLine = bGhostTextReplacesLine;
+		int32 ReplaceLine = GhostTextReplaceLineIndex;
 		DismissGhostText();
+
+		if (bReplaceLine && ReplaceLine >= 0 && ActiveDocumentIndex >= 0 && ActiveDocumentIndex < OpenDocuments.Num())
+		{
+			TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+			TArray<FString> Lines;
+			Doc->CurrentContent.ParseIntoArrayLines(Lines, false);
+			if (ReplaceLine < Lines.Num())
+			{
+				FString Indent;
+				for (TCHAR Ch : Lines[ReplaceLine])
+				{
+					if (Ch == TEXT(' ') || Ch == TEXT('\t')) Indent.AppendChar(Ch);
+					else break;
+				}
+				Lines[ReplaceLine] = Indent + TextToInsert.TrimStart();
+				FString NewContent = FString::Join(Lines, TEXT("\n"));
+				Doc->UndoHistory.Push(Doc->CurrentContent);
+				Doc->RedoHistory.Empty();
+				Doc->CurrentContent = NewContent;
+				Doc->bIsDirty = true;
+				Doc->bIsInternalTextChange = true;
+				CodeTextBox->SetText(FText::FromString(NewContent));
+				Doc->bIsInternalTextChange = false;
+				RebuildTabStrip();
+				OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+				return;
+			}
+		}
+
 		CodeTextBox->InsertTextAtCursor(TextToInsert);
 	}
 }
@@ -5515,6 +5641,8 @@ void SCppEditorPane::CommitGhostText()
 void SCppEditorPane::DismissGhostText()
 {
 	bGhostTextVisible = false;
+	bGhostTextReplacesLine = false;
+	GhostTextReplaceLineIndex = INDEX_NONE;
 	ActiveGhostText.Empty();
 	FCppAiAssistant::Get().CancelPendingCompletion();
 }
@@ -5537,6 +5665,18 @@ void SCppEditorPane::ApplyAiCodeChange(const FString& NewCode)
 
 	DismissGhostText();
 	TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+
+	// 1. Idempotency Check: if exact code is already present, do not duplicate!
+	const FString TrimmedNewCode = NewCode.TrimStartAndEnd();
+	if (Doc->CurrentContent.Contains(TrimmedNewCode))
+	{
+		FNotificationInfo Info(FText::FromString(FString::Printf(TEXT("✓ %s is already up to date with this change"), *Doc->Filename)));
+		Info.ExpireDuration = 2.5f;
+		Info.bFireAndForget = true;
+		FSlateNotificationManager::Get().AddNotification(Info);
+		return;
+	}
+
 	Doc->UndoHistory.Push(Doc->CurrentContent);
 	Doc->RedoHistory.Empty();
 
@@ -5544,79 +5684,186 @@ void SCppEditorPane::ApplyAiCodeChange(const FString& NewCode)
 	{
 		// Replace selected code directly
 		CodeTextBox->InsertTextAtCursor(NewCode);
+		return;
 	}
-	else
-	{
-		// Check if NewCode represents an entire file replacement
-		if (NewCode.Contains(TEXT("#pragma once")) || (NewCode.Contains(TEXT("#include")) && (NewCode.Contains(TEXT("class ")) || NewCode.Contains(TEXT("struct ")))))
-		{
-			Doc->CurrentContent = NewCode;
-			Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
-			Doc->bIsInternalTextChange = true;
-			CodeTextBox->SetText(FText::FromString(NewCode));
-			Doc->bIsInternalTextChange = false;
-			RebuildTabStrip();
-			OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
-		}
-		else
-		{
-			// Check if NewCode contains a function signature matching a function in Doc
-			int32 OpenParen = NewCode.Find(TEXT("("));
-			bool bReplacedFunction = false;
-			if (OpenParen != INDEX_NONE)
-			{
-				FString FuncSigPrefix = NewCode.Left(OpenParen).TrimStartAndEnd();
-				int32 SpaceIdx = FuncSigPrefix.Find(TEXT(" "), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
-				FString FuncIdentifier = (SpaceIdx != INDEX_NONE) ? FuncSigPrefix.Mid(SpaceIdx + 1).TrimStartAndEnd() : FuncSigPrefix;
-				if (!FuncIdentifier.IsEmpty())
-				{
-					int32 FoundInDoc = Doc->CurrentContent.Find(FuncIdentifier);
-					if (FoundInDoc != INDEX_NONE)
-					{
-						int32 DocBraceOpen = Doc->CurrentContent.Find(TEXT("{"), ESearchCase::IgnoreCase, ESearchDir::FromStart, FoundInDoc);
-						if (DocBraceOpen != INDEX_NONE)
-						{
-							int32 BraceDepth = 1;
-							int32 DocBraceClose = INDEX_NONE;
-							for (int32 b = DocBraceOpen + 1; b < Doc->CurrentContent.Len(); ++b)
-							{
-								if (Doc->CurrentContent[b] == TEXT('{')) BraceDepth++;
-								else if (Doc->CurrentContent[b] == TEXT('}'))
-								{
-									BraceDepth--;
-									if (BraceDepth == 0)
-									{
-										DocBraceClose = b;
-										break;
-									}
-								}
-							}
-							if (DocBraceClose != INDEX_NONE)
-							{
-								int32 LineStart = Doc->CurrentContent.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromEnd, FoundInDoc);
-								LineStart = (LineStart == INDEX_NONE) ? 0 : LineStart + 1;
 
-								FString UpdatedContent = Doc->CurrentContent.Left(LineStart) + NewCode + Doc->CurrentContent.Mid(DocBraceClose + 1);
-								Doc->CurrentContent = UpdatedContent;
-								Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
-								Doc->bIsInternalTextChange = true;
-								CodeTextBox->SetText(FText::FromString(UpdatedContent));
-								Doc->bIsInternalTextChange = false;
-								RebuildTabStrip();
-								OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
-								bReplacedFunction = true;
+	// 2. Full file replacement check
+	if (NewCode.Contains(TEXT("#pragma once")) || (NewCode.Contains(TEXT("#include")) && (NewCode.Contains(TEXT("class ")) || NewCode.Contains(TEXT("struct ")))))
+	{
+		Doc->CurrentContent = NewCode;
+		Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+		Doc->bIsInternalTextChange = true;
+		CodeTextBox->SetText(FText::FromString(NewCode));
+		Doc->bIsInternalTextChange = false;
+		RebuildTabStrip();
+		OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+		return;
+	}
+
+	// 3. Header file: Property or member variable addition / replacement
+	if (Doc->FilePath.EndsWith(TEXT(".h"), ESearchCase::IgnoreCase) && NewCode.Contains(TEXT("UPROPERTY")))
+	{
+		// Extract member identifier (e.g. MeshComponent)
+		static const FRegexPattern VarPattern(TEXT("UPROPERTY[^\n;]*[\\r\\n]+[^;\\n]*\\s+([A-Za-z0-9_]+);"));
+		FRegexMatcher VarMatcher(VarPattern, NewCode);
+		FString VarName;
+		if (VarMatcher.FindNext())
+		{
+			VarName = VarMatcher.GetCaptureGroup(1);
+		}
+
+		if (!VarName.IsEmpty() && Doc->CurrentContent.Contains(VarName))
+		{
+			// Variable already exists in header: replace the existing property declaration
+			int32 ExistingPos = Doc->CurrentContent.Find(VarName);
+			int32 LineStart = Doc->CurrentContent.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromEnd, ExistingPos);
+			LineStart = (LineStart == INDEX_NONE) ? 0 : LineStart + 1;
+			int32 PrevUProp = Doc->CurrentContent.Find(TEXT("UPROPERTY"), ESearchCase::IgnoreCase, ESearchDir::FromEnd, ExistingPos);
+			if (PrevUProp != INDEX_NONE && PrevUProp > LineStart - 100)
+			{
+				LineStart = Doc->CurrentContent.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromEnd, PrevUProp);
+				LineStart = (LineStart == INDEX_NONE) ? 0 : LineStart + 1;
+			}
+			int32 SemiColon = Doc->CurrentContent.Find(TEXT(";"), ESearchCase::IgnoreCase, ESearchDir::FromStart, ExistingPos);
+			if (SemiColon != INDEX_NONE)
+			{
+				FString UpdatedContent = Doc->CurrentContent.Left(LineStart) + NewCode + Doc->CurrentContent.Mid(SemiColon + 1);
+				Doc->CurrentContent = UpdatedContent;
+				Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+				Doc->bIsInternalTextChange = true;
+				CodeTextBox->SetText(FText::FromString(UpdatedContent));
+				Doc->bIsInternalTextChange = false;
+				RebuildTabStrip();
+				OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+				return;
+			}
+		}
+
+		// Insert into class declaration (before closing }; or under public:)
+		int32 GeneratedBodyPos = Doc->CurrentContent.Find(TEXT("GENERATED_BODY()"));
+		if (GeneratedBodyPos != INDEX_NONE)
+		{
+			int32 InsertPos = Doc->CurrentContent.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromStart, GeneratedBodyPos);
+			if (InsertPos != INDEX_NONE)
+			{
+				InsertPos += 1;
+				FString FormattedInsertion = TEXT("\npublic:\n\t") + NewCode.Replace(TEXT("\n"), TEXT("\n\t")) + TEXT("\n");
+				FString UpdatedContent = Doc->CurrentContent.Left(InsertPos) + FormattedInsertion + Doc->CurrentContent.Mid(InsertPos);
+				Doc->CurrentContent = UpdatedContent;
+				Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+				Doc->bIsInternalTextChange = true;
+				CodeTextBox->SetText(FText::FromString(UpdatedContent));
+				Doc->bIsInternalTextChange = false;
+				RebuildTabStrip();
+				OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+				return;
+			}
+		}
+	}
+
+	// 4. Source file: Constructor statements (CreateDefaultSubobject, RootComponent, etc.)
+	if (Doc->FilePath.EndsWith(TEXT(".cpp"), ESearchCase::IgnoreCase) && 
+		(NewCode.Contains(TEXT("CreateDefaultSubobject")) || NewCode.Contains(TEXT("RootComponent ="))))
+	{
+		FString ClassBase = FPaths::GetBaseFilename(Doc->FilePath);
+		FString CtorSignature = FString::Printf(TEXT("A%s::A%s("), *ClassBase, *ClassBase);
+		int32 CtorPos = Doc->CurrentContent.Find(CtorSignature);
+		if (CtorPos == INDEX_NONE)
+		{
+			CtorPos = Doc->CurrentContent.Find(FString::Printf(TEXT("U%s::U%s("), *ClassBase, *ClassBase));
+		}
+		if (CtorPos != INDEX_NONE)
+		{
+			if (Doc->CurrentContent.Contains(NewCode.TrimStartAndEnd()))
+			{
+				return;
+			}
+			int32 BraceOpen = Doc->CurrentContent.Find(TEXT("{"), ESearchCase::IgnoreCase, ESearchDir::FromStart, CtorPos);
+			if (BraceOpen != INDEX_NONE)
+			{
+				int32 Depth = 1;
+				int32 BraceClose = INDEX_NONE;
+				for (int32 b = BraceOpen + 1; b < Doc->CurrentContent.Len(); ++b)
+				{
+					if (Doc->CurrentContent[b] == TEXT('{')) Depth++;
+					else if (Doc->CurrentContent[b] == TEXT('}'))
+					{
+						Depth--;
+						if (Depth == 0) { BraceClose = b; break; }
+					}
+				}
+				if (BraceClose != INDEX_NONE)
+				{
+					FString FormattedInsertion = TEXT("\t") + NewCode.Replace(TEXT("\n"), TEXT("\n\t")) + TEXT("\n");
+					FString UpdatedContent = Doc->CurrentContent.Left(BraceClose) + FormattedInsertion + Doc->CurrentContent.Mid(BraceClose);
+					Doc->CurrentContent = UpdatedContent;
+					Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+					Doc->bIsInternalTextChange = true;
+					CodeTextBox->SetText(FText::FromString(UpdatedContent));
+					Doc->bIsInternalTextChange = false;
+					RebuildTabStrip();
+					OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+					return;
+				}
+			}
+		}
+	}
+
+	// 5. Function implementation replacement
+	int32 OpenParen = NewCode.Find(TEXT("("));
+	bool bReplacedFunction = false;
+	if (OpenParen != INDEX_NONE)
+	{
+		FString FuncSigPrefix = NewCode.Left(OpenParen).TrimStartAndEnd();
+		int32 SpaceIdx = FuncSigPrefix.Find(TEXT(" "), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
+		FString FuncIdentifier = (SpaceIdx != INDEX_NONE) ? FuncSigPrefix.Mid(SpaceIdx + 1).TrimStartAndEnd() : FuncSigPrefix;
+		if (!FuncIdentifier.IsEmpty())
+		{
+			int32 FoundInDoc = Doc->CurrentContent.Find(FuncIdentifier);
+			if (FoundInDoc != INDEX_NONE)
+			{
+				int32 DocBraceOpen = Doc->CurrentContent.Find(TEXT("{"), ESearchCase::IgnoreCase, ESearchDir::FromStart, FoundInDoc);
+				if (DocBraceOpen != INDEX_NONE)
+				{
+					int32 BraceDepth = 1;
+					int32 DocBraceClose = INDEX_NONE;
+					for (int32 b = DocBraceOpen + 1; b < Doc->CurrentContent.Len(); ++b)
+					{
+						if (Doc->CurrentContent[b] == TEXT('{')) BraceDepth++;
+						else if (Doc->CurrentContent[b] == TEXT('}'))
+						{
+							BraceDepth--;
+							if (BraceDepth == 0)
+							{
+								DocBraceClose = b;
+								break;
 							}
 						}
 					}
+					if (DocBraceClose != INDEX_NONE)
+					{
+						int32 LineStart = Doc->CurrentContent.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromEnd, FoundInDoc);
+						LineStart = (LineStart == INDEX_NONE) ? 0 : LineStart + 1;
+
+						FString UpdatedContent = Doc->CurrentContent.Left(LineStart) + NewCode + Doc->CurrentContent.Mid(DocBraceClose + 1);
+						Doc->CurrentContent = UpdatedContent;
+						Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+						Doc->bIsInternalTextChange = true;
+						CodeTextBox->SetText(FText::FromString(UpdatedContent));
+						Doc->bIsInternalTextChange = false;
+						RebuildTabStrip();
+						OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+						bReplacedFunction = true;
+					}
 				}
 			}
-
-			if (!bReplacedFunction)
-			{
-				// Fallback: Insert at current cursor
-				CodeTextBox->InsertTextAtCursor(NewCode);
-			}
 		}
+	}
+
+	if (!bReplacedFunction)
+	{
+		// Fallback: Insert at current cursor
+		CodeTextBox->InsertTextAtCursor(NewCode);
 	}
 }
 
