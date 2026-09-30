@@ -923,7 +923,15 @@ void SCreateClassDialog::GenerateCode(FString& OutHeaderCode, FString& OutSource
 		IFileManager::Get().FindFiles(BuildFiles, *(CurrentDir / TEXT("*.Build.cs")), true, false);
 		if (BuildFiles.Num() > 0)
 		{
-			ModuleName = FPaths::GetBaseFilename(BuildFiles[0]);
+			FString BuildFileName = FPaths::GetCleanFilename(BuildFiles[0]);
+			if (BuildFileName.EndsWith(TEXT(".Build.cs"), ESearchCase::IgnoreCase))
+			{
+				ModuleName = BuildFileName.LeftChop(9);
+			}
+			else
+			{
+				ModuleName = FPaths::GetBaseFilename(BuildFileName);
+			}
 			break;
 		}
 		CurrentDir = FPaths::GetPath(CurrentDir);
@@ -1213,6 +1221,70 @@ void SCreateClassDialog::GenerateCode(FString& OutHeaderCode, FString& OutSource
 			"\tSuper::Tick(DeltaTime);\n"
 			"}\n"
 		), *BaseName, *ClassName, *ClassName, *ClassName, *ClassName);
+		break;
+
+	case EClassTemplateType::UActorComponentClass:
+		OutHeaderCode = FString::Printf(TEXT(
+			"// Copyright (c) 2026. All Rights Reserved.\n\n"
+			"#pragma once\n\n"
+			"#include \"CoreMinimal.h\"\n"
+			"#include \"Components/ActorComponent.h\"\n"
+			"#include \"%s.generated.h\"\n\n"
+			"UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))\n"
+			"class %s %s : public UActorComponent\n"
+			"{\n"
+			"\tGENERATED_BODY()\n\n"
+			"public:\n"
+			"\t%s();\n\n"
+			"protected:\n"
+			"\tvirtual void BeginPlay() override;\n\n"
+			"public:\n"
+			"\tvirtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;\n"
+			"};\n"
+		), *BaseName, *ModuleApiMacro, *ClassName, *ClassName);
+
+		OutSourceCode = FString::Printf(TEXT(
+			"// Copyright (c) 2026. All Rights Reserved.\n\n"
+			"#include \"%s.h\"\n\n"
+			"%s::%s()\n"
+			"{\n"
+			"\tPrimaryComponentTick.bCanEverTick = true;\n"
+			"}\n\n"
+			"void %s::BeginPlay()\n"
+			"{\n"
+			"\tSuper::BeginPlay();\n"
+			"}\n\n"
+			"void %s::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)\n"
+			"{\n"
+			"\tSuper::TickComponent(DeltaTime, TickType, ThisTickFunction);\n"
+			"}\n"
+		), *BaseName, *ClassName, *ClassName, *ClassName, *ClassName);
+		break;
+
+	case EClassTemplateType::SceneComponent:
+		OutHeaderCode = FString::Printf(TEXT(
+			"// Copyright (c) 2026. All Rights Reserved.\n\n"
+			"#pragma once\n\n"
+			"#include \"CoreMinimal.h\"\n"
+			"#include \"Components/SceneComponent.h\"\n"
+			"#include \"%s.generated.h\"\n\n"
+			"UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))\n"
+			"class %s %s : public USceneComponent\n"
+			"{\n"
+			"\tGENERATED_BODY()\n\n"
+			"public:\n"
+			"\t%s();\n"
+			"};\n"
+		), *BaseName, *ModuleApiMacro, *ClassName, *ClassName);
+
+		OutSourceCode = FString::Printf(TEXT(
+			"// Copyright (c) 2026. All Rights Reserved.\n\n"
+			"#include \"%s.h\"\n\n"
+			"%s::%s()\n"
+			"{\n"
+			"\tPrimaryComponentTick.bCanEverTick = false;\n"
+			"}\n"
+		), *BaseName, *ClassName, *ClassName);
 		break;
 
 	case EClassTemplateType::UserWidgetClass:
