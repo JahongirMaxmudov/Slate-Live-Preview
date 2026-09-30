@@ -5,14 +5,17 @@
 #include "CoreMinimal.h"
 #include "CppEditorSettings.h"
 #include "Interfaces/IHttpRequest.h"
+#include "Containers/Ticker.h"
 
 DECLARE_DELEGATE_TwoParams(FOnAiCompletionReceived, const FString& /* CompletionText */, bool /* bSuccess */);
 DECLARE_DELEGATE_TwoParams(FOnAiChatReceived, const FString& /* ResponseText */, bool /* bSuccess */);
 DECLARE_DELEGATE_TwoParams(FOnAiTestResult, bool /* bSuccess */, const FString& /* Message */);
+DECLARE_DELEGATE_TwoParams(FOnGitHubDeviceCodeReceived, const FString& /* UserCode */, const FString& /* VerificationUri */);
+DECLARE_DELEGATE_TwoParams(FOnGitHubAuthComplete, bool /* bSuccess */, const FString& /* MessageOrUsername */);
 
 /**
  * Universal AI Assistant & Copilot Client for C++ Studio.
- * Connects to Local Ollama, LM Studio, DeepSeek, OpenAI, or any OpenAI-compatible API.
+ * Connects to Local Ollama, LM Studio, DeepSeek, OpenAI, GitHub Copilot, or any OpenAI-compatible API.
  */
 class SLATELIVEPREVIEW_API FCppAiAssistant : public TSharedFromThis<FCppAiAssistant>
 {
@@ -55,12 +58,32 @@ public:
 
 	bool IsRequestActive() const { return bIsRequestInFlight; }
 
+	/**
+	 * GitHub Copilot Device Authentication Flow (RFC 8628)
+	 */
+	void StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeReceived, FOnGitHubAuthComplete InComplete);
+	void CancelGitHubAuth();
+	bool IsGitHubAuthenticated() const;
+	void SignOutOfGitHub();
+	void FetchCopilotToken(const FString& InAccessToken, TFunction<void(bool, const FString&)> OnTokenFetched);
+
 private:
 	FCppAiAssistant() = default;
 	~FCppAiAssistant() = default;
 
 	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> ActiveCompletionRequest;
 	bool bIsRequestInFlight = false;
+
+	// GitHub Copilot Device Code Auth State
+	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> ActiveDeviceAuthRequest;
+	FTSTicker::FDelegateHandle DevicePollTickerHandle;
+	FString ActiveDeviceCode;
+	int32 DevicePollInterval = 5;
+	double DeviceAuthExpiresAt = 0.0;
+	FOnGitHubAuthComplete ActiveAuthCompleteCallback;
+
+	void PollGitHubDeviceToken();
+	void FetchGitHubUsername(const FString& InAccessToken, TFunction<void(const FString&)> OnUsernameFetched);
 
 	static FString CleanGeneratedCode(const FString& RawResponse);
 };

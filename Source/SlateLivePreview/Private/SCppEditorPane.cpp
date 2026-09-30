@@ -788,6 +788,108 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 						]
 					]
 				]
+
+				// Floating Hover Documentation (Quick Info) Card
+				+ SOverlay::Slot()
+				.HAlign(HAlign_Left)
+				.VAlign(VAlign_Top)
+				.Padding(TAttribute<FMargin>::CreateSP(this, &SCppEditorPane::GetHoverDocMargin))
+				[
+					SAssignNew(HoverDocCard, SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("Menu.Background"))
+					.BorderBackgroundColor(FLinearColor(0.10f, 0.11f, 0.14f, 0.98f))
+					.Padding(8.0f)
+					.Visibility(EVisibility::Collapsed)
+					[
+						SNew(SBox)
+						.WidthOverride(380.0f)
+						[
+							SNew(SVerticalBox)
+
+							// Header: Category & Signature
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.0f, 0.0f, 0.0f, 4.0f)
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot()
+								.AutoWidth()
+								.VAlign(VAlign_Center)
+								.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+								[
+									SNew(SBorder)
+									.BorderImage(FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+									.BorderBackgroundColor(FLinearColor(0.2f, 0.4f, 0.7f, 0.9f))
+									.Padding(FMargin(5.0f, 1.0f))
+									[
+										SAssignNew(HoverDocCategoryText, STextBlock)
+										.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8.0f))
+										.ColorAndOpacity(FLinearColor::White)
+									]
+								]
+								+ SHorizontalBox::Slot()
+								.FillWidth(1.0f)
+								.VAlign(VAlign_Center)
+								[
+									SAssignNew(HoverDocSignatureText, STextBlock)
+									.Font(FCppSyntaxHighlighterMarshaller::GetEditorFont(9.0f))
+									.ColorAndOpacity(FLinearColor(0.35f, 0.75f, 1.0f, 1.0f))
+									.AutoWrapText(true)
+								]
+							]
+
+							// Description
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.0f, 2.0f, 0.0f, 4.0f)
+							[
+								SAssignNew(HoverDocDescriptionText, STextBlock)
+								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8.5f))
+								.ColorAndOpacity(FLinearColor(0.85f, 0.85f, 0.90f, 1.0f))
+								.AutoWrapText(true)
+							]
+
+							// Epic Games Documentation Link
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.0f, 2.0f, 0.0f, 0.0f)
+							[
+								SAssignNew(HoverDocUrlButton, SButton)
+								.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+								.ContentPadding(FMargin(2.0f))
+								.OnClicked_Lambda([this]() -> FReply
+								{
+									if (!ActiveHoverDocUrl.IsEmpty())
+									{
+										FPlatformProcess::LaunchURL(*ActiveHoverDocUrl, nullptr, nullptr);
+									}
+									return FReply::Handled();
+								})
+								[
+									SNew(SHorizontalBox)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+									[
+										SNew(SImage)
+										.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.ShowInExplorer")))
+										.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+									]
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									[
+										SNew(STextBlock)
+										.Text(FText::FromString(TEXT("Epic Games Documentation")))
+										.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
+										.ColorAndOpacity(FLinearColor(0.33f, 0.65f, 1.0f, 1.0f))
+									]
+								]
+							]
+						]
+					]
+				]
 			]
 		]
 		// ---------------------------------------------------------------------
@@ -1876,6 +1978,7 @@ void SCppEditorPane::Log(const FString& Message)
 
 FReply SCppEditorPane::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
 {
+	DismissHoverDoc();
 	FocusEditor();
 	return FReply::Unhandled();
 }
@@ -3502,6 +3605,253 @@ FMargin SCppEditorPane::GetIntelliSenseMargin() const
 	return FMargin(X, Y, 0.0f, 0.0f);
 }
 
+FMargin SCppEditorPane::GetHoverDocMargin() const
+{
+	if (HoverDocCard.IsValid())
+	{
+		TSharedPtr<SWidget> ParentWidget = HoverDocCard->GetParentWidget();
+		if (ParentWidget.IsValid())
+		{
+			FGeometry ParentGeo = ParentWidget->GetTickSpaceGeometry();
+			FVector2D LocalPos = ParentGeo.AbsoluteToLocal(HoverDocScreenPosition);
+
+			float X = (float)LocalPos.X + 8.0f;
+			float Y = (float)LocalPos.Y + 16.0f;
+
+			FVector2D LocalSize = (FVector2D)ParentGeo.GetLocalSize();
+			const float CardWidth = 380.0f;
+			const float CardHeight = 120.0f;
+
+			if (X + CardWidth > LocalSize.X - 10.0f)
+			{
+				X = FMath::Max(10.0f, (float)(LocalSize.X - CardWidth - 10.0f));
+			}
+			if (Y + CardHeight > LocalSize.Y - 10.0f)
+			{
+				Y = FMath::Max(10.0f, (float)(LocalPos.Y - CardHeight - 8.0f));
+			}
+
+			return FMargin(FMath::Max(0.0f, X), FMath::Max(0.0f, Y), 0.0f, 0.0f);
+		}
+	}
+	return FMargin(40.0f, 40.0f, 0.0f, 0.0f);
+}
+
+FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
+{
+	if (!CodeTextBox.IsValid() || ActiveDocumentIndex == INDEX_NONE || ActiveDocumentIndex >= OpenDocuments.Num())
+	{
+		return FString();
+	}
+
+	FGeometry TextGeo = CodeTextBox->GetTickSpaceGeometry();
+	FVector2D LocalPos = TextGeo.AbsoluteToLocal(ScreenPos);
+	FVector2D TextSize = (FVector2D)TextGeo.GetLocalSize();
+
+	// Check if cursor is inside CodeTextBox
+	if (LocalPos.X < 0.0f || LocalPos.X > TextSize.X || LocalPos.Y < 0.0f || LocalPos.Y > TextSize.Y)
+	{
+		return FString();
+	}
+
+	int32 TotalLines = GetTotalLineCount();
+	if (TotalLines <= 0)
+	{
+		return FString();
+	}
+
+	const float LineHeight = 18.0f;
+	int32 FirstLine = 0;
+	if (CodeTextBox->GetVScrollBar().IsValid())
+	{
+		float ScrollFraction = CodeTextBox->GetVScrollBar()->DistanceFromTop();
+		FirstLine = FMath::Clamp(FMath::FloorToInt(ScrollFraction * TotalLines), 0, FMath::Max(0, TotalLines - 1));
+	}
+
+	int32 LineIndex = FirstLine + FMath::FloorToInt(((float)LocalPos.Y - 4.0f) / LineHeight);
+	if (LineIndex < 0 || LineIndex >= TotalLines)
+	{
+		return FString();
+	}
+
+	TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+	TArray<FString> Lines;
+	Doc->CurrentContent.ParseIntoArrayLines(Lines, false);
+	if (!Lines.IsValidIndex(LineIndex))
+	{
+		return FString();
+	}
+
+	const FString& Line = Lines[LineIndex];
+	if (Line.IsEmpty())
+	{
+		return FString();
+	}
+
+	FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont();
+	TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+
+	// Estimate character position by measuring substrings
+	float TargetX = (float)LocalPos.X - 4.0f;
+	if (TargetX < 0.0f)
+	{
+		return FString();
+	}
+
+	int32 FoundCharIdx = INDEX_NONE;
+	for (int32 i = 0; i <= Line.Len(); ++i)
+	{
+		FString Sub = Line.Left(i);
+		Sub.ReplaceInline(TEXT("\t"), TEXT("    "));
+		float MeasuredX = (float)FontMeasure->Measure(Sub, FontInfo).X;
+		if (MeasuredX >= TargetX)
+		{
+			FoundCharIdx = FMath::Max(0, i - 1);
+			break;
+		}
+	}
+
+	if (FoundCharIdx == INDEX_NONE || !Line.IsValidIndex(FoundCharIdx))
+	{
+		return FString();
+	}
+
+	// Check if this character is an identifier character
+	TCHAR HitChar = Line[FoundCharIdx];
+	if (!FChar::IsAlnum(HitChar) && HitChar != TEXT('_'))
+	{
+		return FString();
+	}
+
+	// Expand to entire identifier
+	int32 Start = FoundCharIdx;
+	while (Start > 0 && (FChar::IsAlnum(Line[Start - 1]) || Line[Start - 1] == TEXT('_')))
+	{
+		Start--;
+	}
+
+	int32 End = FoundCharIdx;
+	while (End < Line.Len() && (FChar::IsAlnum(Line[End]) || Line[End] == TEXT('_')))
+	{
+		End++;
+	}
+
+	return Line.Mid(Start, End - Start);
+}
+
+void SCppEditorPane::ShowHoverDoc(const FString& Word, const FVector2D& ScreenPos)
+{
+	TSharedPtr<FIntelliSenseItem> Item = FindDocItemForWord(Word);
+	if (!Item.IsValid())
+	{
+		DismissHoverDoc();
+		return;
+	}
+
+	HoverDocScreenPosition = ScreenPos;
+	LastHoveredWord = Word;
+	bHoverDocVisible = true;
+
+	if (HoverDocCategoryText.IsValid())
+	{
+		FString CategoryStr;
+		switch (Item->Category)
+		{
+		case EIntelliSenseCategory::Keyword:  CategoryStr = TEXT("C++ KEYWORD"); break;
+		case EIntelliSenseCategory::Type:     CategoryStr = TEXT("UNREAL / SLATE TYPE"); break;
+		case EIntelliSenseCategory::Method:   CategoryStr = (Item->Scope == TEXT("slot")) ? TEXT("SLATE SLOT METHOD") : TEXT("METHOD / FUNCTION"); break;
+		case EIntelliSenseCategory::Field:    CategoryStr = TEXT("STRUCT / CLASS FIELD"); break;
+		case EIntelliSenseCategory::Macro:    CategoryStr = TEXT("UNREAL / SLATE MACRO"); break;
+		case EIntelliSenseCategory::Delegate: CategoryStr = TEXT("UNREAL DELEGATE / EVENT"); break;
+		case EIntelliSenseCategory::Enum:     CategoryStr = TEXT("ENUM / CONSTANT"); break;
+		case EIntelliSenseCategory::Variable: CategoryStr = TEXT("VARIABLE"); break;
+		default:                              CategoryStr = TEXT("SYMBOL"); break;
+		}
+		HoverDocCategoryText->SetText(FText::FromString(CategoryStr));
+	}
+
+	if (HoverDocSignatureText.IsValid())
+	{
+		FString DisplaySig = Item->Signature.IsEmpty() ? Item->DisplayText : Item->Signature;
+		HoverDocSignatureText->SetText(FText::FromString(DisplaySig));
+	}
+
+	if (HoverDocDescriptionText.IsValid())
+	{
+		FString Desc = Item->Description.IsEmpty() ? FString::Printf(TEXT("Symbol declared in code: %s"), *Item->DisplayText) : Item->Description;
+		HoverDocDescriptionText->SetText(FText::FromString(Desc));
+	}
+
+	ActiveHoverDocUrl = Item->DocUrl;
+	if (HoverDocUrlButton.IsValid())
+	{
+		HoverDocUrlButton->SetVisibility(ActiveHoverDocUrl.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible);
+	}
+
+	if (HoverDocCard.IsValid())
+	{
+		HoverDocCard->SetVisibility(EVisibility::Visible);
+	}
+}
+
+void SCppEditorPane::DismissHoverDoc()
+{
+	bHoverDocVisible = false;
+	LastHoveredWord.Empty();
+	if (HoverDocCard.IsValid())
+	{
+		HoverDocCard->SetVisibility(EVisibility::Collapsed);
+	}
+}
+
+TSharedPtr<FIntelliSenseItem> SCppEditorPane::FindDocItemForWord(const FString& Word) const
+{
+	if (Word.IsEmpty())
+	{
+		return nullptr;
+	}
+
+	EnsureIntelliSenseDatabaseLoaded();
+
+	// 1. Exact match in master database
+	for (const auto& Item : MasterIntelliSenseDatabase)
+	{
+		if (Item->DisplayText.Equals(Word, ESearchCase::CaseSensitive))
+		{
+			return Item;
+		}
+	}
+
+	// 2. Case-insensitive match in master database
+	for (const auto& Item : MasterIntelliSenseDatabase)
+	{
+		if (Item->DisplayText.Equals(Word, ESearchCase::IgnoreCase))
+		{
+			return Item;
+		}
+	}
+
+	// 3. Search document symbols
+	TArray<TSharedPtr<FIntelliSenseItem>> DocSymbols;
+	HarvestDocumentSymbols(DocSymbols);
+	for (const auto& Sym : DocSymbols)
+	{
+		if (Sym->DisplayText.Equals(Word, ESearchCase::CaseSensitive))
+		{
+			return Sym;
+		}
+	}
+	for (const auto& Sym : DocSymbols)
+	{
+		if (Sym->DisplayText.Equals(Word, ESearchCase::IgnoreCase))
+		{
+			return Sym;
+		}
+	}
+
+	return nullptr;
+}
+
 void SCppEditorPane::HarvestDocumentSymbols(TArray<TSharedPtr<FIntelliSenseItem>>& OutSymbols) const
 {
 	TSet<FString> CollectedNames;
@@ -3655,6 +4005,7 @@ void SCppEditorPane::HarvestDocumentSymbols(TArray<TSharedPtr<FIntelliSenseItem>
 
 FReply SCppEditorPane::HandleCodeTextBoxKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent)
 {
+	DismissHoverDoc();
 	const TCHAR Char = InCharacterEvent.GetCharacter();
 
 	// Consume Tab character event so it NEVER double-inserts!
@@ -3738,6 +4089,7 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyChar(const FGeometry& MyGeometry, con
 
 FReply SCppEditorPane::HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
+	DismissHoverDoc();
 	const FKey Key = InKeyEvent.GetKey();
 
 	// 0. AI Copilot Ghost Text Key Handling
@@ -4524,6 +4876,51 @@ void SCppEditorPane::Tick(const FGeometry& AllottedGeometry, const double InCurr
 		else
 		{
 			bPendingAiRequest = false;
+		}
+	}
+
+	// Hover documentation (Quick Info) detection
+	if (FSlateApplication::IsInitialized())
+	{
+		FVector2D CurrentCursorPos = FSlateApplication::Get().GetCursorPos();
+		if (FVector2D::Distance(CurrentCursorPos, LastMouseScreenPosition) > 3.0f)
+		{
+			LastMouseScreenPosition = CurrentCursorPos;
+			LastMouseMoveTime = FPlatformTime::Seconds();
+
+			// If hover doc is visible, check if mouse moved over the hover card itself
+			if (bHoverDocVisible)
+			{
+				bool bOverCard = false;
+				if (HoverDocCard.IsValid() && HoverDocCard->GetVisibility() == EVisibility::Visible)
+				{
+					FGeometry CardGeo = HoverDocCard->GetTickSpaceGeometry();
+					FVector2D CardLocal = CardGeo.AbsoluteToLocal(CurrentCursorPos);
+					FVector2D CardSize = (FVector2D)CardGeo.GetLocalSize();
+					if (CardLocal.X >= 0.0f && CardLocal.X <= CardSize.X && CardLocal.Y >= 0.0f && CardLocal.Y <= CardSize.Y)
+					{
+						bOverCard = true;
+					}
+				}
+
+				if (!bOverCard)
+				{
+					DismissHoverDoc();
+				}
+			}
+		}
+		else
+		{
+			// Mouse has been stationary
+			const double StationaryDuration = FPlatformTime::Seconds() - LastMouseMoveTime;
+			if (StationaryDuration >= 0.350 && !bHoverDocVisible && !bIntelliSenseActive)
+			{
+				FString HoveredWord = GetWordAtScreenPosition(CurrentCursorPos);
+				if (!HoveredWord.IsEmpty() && HoveredWord != LastHoveredWord)
+				{
+					ShowHoverDoc(HoveredWord, CurrentCursorPos);
+				}
+			}
 		}
 	}
 }

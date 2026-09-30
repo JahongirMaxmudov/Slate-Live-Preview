@@ -8,6 +8,10 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonReader.h"
 #include "Misc/Paths.h"
+#include "Misc/DateTime.h"
+#include "HAL/PlatformApplicationMisc.h"
+#include "HAL/PlatformProcess.h"
+#include "Containers/Ticker.h"
 
 FCppAiAssistant& FCppAiAssistant::Get()
 {
@@ -81,7 +85,28 @@ void FCppAiAssistant::RequestInlineCompletion(
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 	Request->SetTimeout(5.0f); // Fast 5-second timeout for snappy inline code completion
 
-	if (!Settings.AiApiKey.IsEmpty())
+	if (Settings.AiProvider == EAiProvider::GitHubCopilot || Endpoint.Contains(TEXT("githubcopilot.com")))
+	{
+		Request->SetHeader(TEXT("Editor-Version"), TEXT("vscode/1.85.0"));
+		Request->SetHeader(TEXT("Editor-Plugin-Version"), TEXT("copilot-chat/0.11.1"));
+		Request->SetHeader(TEXT("Copilot-Integration-Id"), TEXT("vscode-chat"));
+		Request->SetHeader(TEXT("User-Agent"), TEXT("GitHubCopilot/1.138.0"));
+
+		FString AuthToken = Settings.CopilotSessionToken;
+		if (AuthToken.IsEmpty())
+		{
+			AuthToken = Settings.GitHubAccessToken;
+		}
+		if (AuthToken.IsEmpty())
+		{
+			AuthToken = Settings.AiApiKey;
+		}
+		if (!AuthToken.IsEmpty())
+		{
+			Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
+		}
+	}
+	else if (!Settings.AiApiKey.IsEmpty())
 	{
 		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Settings.AiApiKey));
 	}
@@ -203,7 +228,28 @@ void FCppAiAssistant::SendChatMessage(
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 	Request->SetTimeout(45.0f);
 
-	if (!Settings.AiApiKey.IsEmpty())
+	if (Settings.AiProvider == EAiProvider::GitHubCopilot || Endpoint.Contains(TEXT("githubcopilot.com")))
+	{
+		Request->SetHeader(TEXT("Editor-Version"), TEXT("vscode/1.85.0"));
+		Request->SetHeader(TEXT("Editor-Plugin-Version"), TEXT("copilot-chat/0.11.1"));
+		Request->SetHeader(TEXT("Copilot-Integration-Id"), TEXT("vscode-chat"));
+		Request->SetHeader(TEXT("User-Agent"), TEXT("GitHubCopilot/1.138.0"));
+
+		FString AuthToken = Settings.CopilotSessionToken;
+		if (AuthToken.IsEmpty())
+		{
+			AuthToken = Settings.GitHubAccessToken;
+		}
+		if (AuthToken.IsEmpty())
+		{
+			AuthToken = Settings.AiApiKey;
+		}
+		if (!AuthToken.IsEmpty())
+		{
+			Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
+		}
+	}
+	else if (!Settings.AiApiKey.IsEmpty())
 	{
 		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Settings.AiApiKey));
 	}
@@ -327,7 +373,25 @@ void FCppAiAssistant::TestConnection(
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 	Request->SetTimeout(10.0f);
 
-	if (!InApiKey.IsEmpty())
+	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+	if (InEndpoint.Contains(TEXT("githubcopilot.com")) || Settings.AiProvider == EAiProvider::GitHubCopilot)
+	{
+		Request->SetHeader(TEXT("Editor-Version"), TEXT("vscode/1.85.0"));
+		Request->SetHeader(TEXT("Editor-Plugin-Version"), TEXT("copilot-chat/0.11.1"));
+		Request->SetHeader(TEXT("Copilot-Integration-Id"), TEXT("vscode-chat"));
+		Request->SetHeader(TEXT("User-Agent"), TEXT("GitHubCopilot/1.138.0"));
+
+		FString AuthToken = InApiKey;
+		if (AuthToken.IsEmpty())
+		{
+			AuthToken = Settings.CopilotSessionToken.IsEmpty() ? Settings.GitHubAccessToken : Settings.CopilotSessionToken;
+		}
+		if (!AuthToken.IsEmpty())
+		{
+			Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
+		}
+	}
+	else if (!InApiKey.IsEmpty())
 	{
 		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *InApiKey));
 	}
@@ -368,5 +432,311 @@ void FCppAiAssistant::TestConnection(
 		}
 	);
 
+	Request->ProcessRequest();
+}
+
+bool FCppAiAssistant::IsGitHubAuthenticated() const
+{
+	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+	return !Settings.GitHubAccessToken.IsEmpty() || (!Settings.CopilotSessionToken.IsEmpty() && Settings.AiProvider == EAiProvider::GitHubCopilot);
+}
+
+void FCppAiAssistant::SignOutOfGitHub()
+{
+	CancelGitHubAuth();
+	FCppEditorSettings& Settings = FCppEditorSettings::Get();
+	Settings.GitHubAccessToken.Empty();
+	Settings.GitHubUsername.Empty();
+	Settings.CopilotSessionToken.Empty();
+	Settings.CopilotTokenExpiresAt = 0.0;
+	Settings.Save();
+}
+
+void FCppAiAssistant::CancelGitHubAuth()
+{
+	if (DevicePollTickerHandle.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(DevicePollTickerHandle);
+		DevicePollTickerHandle.Reset();
+	}
+	if (ActiveDeviceAuthRequest.IsValid() && ActiveDeviceAuthRequest->GetStatus() == EHttpRequestStatus::Processing)
+	{
+		ActiveDeviceAuthRequest->CancelRequest();
+		ActiveDeviceAuthRequest.Reset();
+	}
+	ActiveDeviceCode.Empty();
+}
+
+void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeReceived, FOnGitHubAuthComplete InComplete)
+{
+	CancelGitHubAuth();
+	ActiveAuthCompleteCallback = InComplete;
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(TEXT("https://github.com/login/device/code"));
+	Request->SetVerb(TEXT("POST"));
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+
+	TSharedPtr<FJsonObject> JsonObj = MakeShared<FJsonObject>();
+	// Standard VS Code GitHub Copilot OAuth client ID
+	JsonObj->SetStringField(TEXT("client_id"), TEXT("019f0fd8758e3d164f1b"));
+	JsonObj->SetStringField(TEXT("scope"), TEXT("read:user"));
+
+	FString Payload;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Payload);
+	FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
+	Request->SetContentAsString(Payload);
+
+	Request->OnProcessRequestComplete().BindLambda(
+		[this, InCodeReceived](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
+		{
+			ActiveDeviceAuthRequest.Reset();
+			if (!bSuccess || !Response.IsValid() || Response->GetResponseCode() != 200)
+			{
+				FString Err = Response.IsValid() ? Response->GetContentAsString() : TEXT("Network failure");
+				ActiveAuthCompleteCallback.ExecuteIfBound(false, FString::Printf(TEXT("Failed to start device auth: %s"), *Err));
+				return;
+			}
+
+			TSharedPtr<FJsonObject> RootObj;
+			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+			if (!FJsonSerializer::Deserialize(Reader, RootObj) || !RootObj.IsValid())
+			{
+				ActiveAuthCompleteCallback.ExecuteIfBound(false, TEXT("Invalid response from GitHub."));
+				return;
+			}
+
+			ActiveDeviceCode = RootObj->GetStringField(TEXT("device_code"));
+			FString UserCode = RootObj->GetStringField(TEXT("user_code"));
+			FString VerificationUri = RootObj->GetStringField(TEXT("verification_uri"));
+			int32 Interval = RootObj->GetIntegerField(TEXT("interval"));
+			int32 ExpiresIn = RootObj->GetIntegerField(TEXT("expires_in"));
+
+			if (Interval <= 0) Interval = 5;
+			if (ExpiresIn <= 0) ExpiresIn = 900;
+
+			DevicePollInterval = Interval;
+			DeviceAuthExpiresAt = FPlatformTime::Seconds() + (double)ExpiresIn;
+
+			// Copy user code to clipboard for convenience
+			FPlatformApplicationMisc::ClipboardCopy(*UserCode);
+
+			// Open browser to verification URI
+			FPlatformProcess::LaunchURL(*VerificationUri, nullptr, nullptr);
+
+			// Notify UI
+			InCodeReceived.ExecuteIfBound(UserCode, VerificationUri);
+
+			// Start polling loop
+			DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+				TEXT("GitHubCopilotDevicePoll"),
+				(float)DevicePollInterval,
+				[this](float) -> bool
+				{
+					PollGitHubDeviceToken();
+					return false; // single execution; will reschedule on each tick
+				}
+			);
+		}
+	);
+
+	ActiveDeviceAuthRequest = Request;
+	Request->ProcessRequest();
+}
+
+void FCppAiAssistant::PollGitHubDeviceToken()
+{
+	if (ActiveDeviceCode.IsEmpty())
+	{
+		return;
+	}
+
+	if (FPlatformTime::Seconds() >= DeviceAuthExpiresAt)
+	{
+		CancelGitHubAuth();
+		ActiveAuthCompleteCallback.ExecuteIfBound(false, TEXT("Authorization session timed out. Please try again."));
+		return;
+	}
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(TEXT("https://github.com/login/oauth/access_token"));
+	Request->SetVerb(TEXT("POST"));
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+
+	TSharedPtr<FJsonObject> JsonObj = MakeShared<FJsonObject>();
+	JsonObj->SetStringField(TEXT("client_id"), TEXT("019f0fd8758e3d164f1b"));
+	JsonObj->SetStringField(TEXT("device_code"), ActiveDeviceCode);
+	JsonObj->SetStringField(TEXT("grant_type"), TEXT("urn:ietf:params:oauth:grant-type:device_code"));
+
+	FString Payload;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Payload);
+	FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
+	Request->SetContentAsString(Payload);
+
+	Request->OnProcessRequestComplete().BindLambda(
+		[this](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
+		{
+			ActiveDeviceAuthRequest.Reset();
+			if (!bSuccess || !Response.IsValid())
+			{
+				// Retry on next interval
+				DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+					TEXT("GitHubCopilotDevicePoll"),
+					(float)DevicePollInterval,
+					[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+				);
+				return;
+			}
+
+			TSharedPtr<FJsonObject> RootObj;
+			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+			if (!FJsonSerializer::Deserialize(Reader, RootObj) || !RootObj.IsValid())
+			{
+				DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+					TEXT("GitHubCopilotDevicePoll"),
+					(float)DevicePollInterval,
+					[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+				);
+				return;
+			}
+
+			if (RootObj->HasField(TEXT("error")))
+			{
+				FString Error = RootObj->GetStringField(TEXT("error"));
+				if (Error == TEXT("authorization_pending"))
+				{
+					// Keep waiting
+					DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+						TEXT("GitHubCopilotDevicePoll"),
+						(float)DevicePollInterval,
+						[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+					);
+					return;
+				}
+				else if (Error == TEXT("slow_down"))
+				{
+					DevicePollInterval += 5;
+					DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+						TEXT("GitHubCopilotDevicePoll"),
+						(float)DevicePollInterval,
+						[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+					);
+					return;
+				}
+				else
+				{
+					FString Desc = RootObj->HasField(TEXT("error_description")) ? RootObj->GetStringField(TEXT("error_description")) : Error;
+					CancelGitHubAuth();
+					ActiveAuthCompleteCallback.ExecuteIfBound(false, Desc);
+					return;
+				}
+			}
+
+			if (RootObj->HasField(TEXT("access_token")))
+			{
+				FString AccessToken = RootObj->GetStringField(TEXT("access_token"));
+				CancelGitHubAuth();
+
+				FCppEditorSettings& Settings = FCppEditorSettings::Get();
+				Settings.GitHubAccessToken = AccessToken;
+				Settings.AiProvider = EAiProvider::GitHubCopilot;
+				Settings.AiEndpoint = TEXT("https://api.githubcopilot.com");
+				Settings.AiModel = TEXT("gpt-4o");
+				Settings.Save();
+
+				// Fetch Username & Copilot Session Token
+				FetchGitHubUsername(AccessToken, [this, AccessToken](const FString& Username)
+				{
+					FCppEditorSettings& Settings = FCppEditorSettings::Get();
+					Settings.GitHubUsername = Username;
+					Settings.Save();
+
+					FetchCopilotToken(AccessToken, [this, Username](bool bCopilotSuccess, const FString& CopilotMsg)
+					{
+						if (bCopilotSuccess)
+						{
+							ActiveAuthCompleteCallback.ExecuteIfBound(true, Username);
+						}
+						else
+						{
+							ActiveAuthCompleteCallback.ExecuteIfBound(true, FString::Printf(TEXT("%s (Note: %s)"), *Username, *CopilotMsg));
+						}
+					});
+				});
+			}
+		}
+	);
+
+	ActiveDeviceAuthRequest = Request;
+	Request->ProcessRequest();
+}
+
+void FCppAiAssistant::FetchGitHubUsername(const FString& InAccessToken, TFunction<void(const FString&)> OnUsernameFetched)
+{
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(TEXT("https://api.github.com/user"));
+	Request->SetVerb(TEXT("GET"));
+	Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("token %s"), *InAccessToken));
+	Request->SetHeader(TEXT("User-Agent"), TEXT("GitHubCopilot/1.138.0"));
+	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+
+	Request->OnProcessRequestComplete().BindLambda(
+		[OnUsernameFetched](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
+		{
+			if (bSuccess && Response.IsValid() && Response->GetResponseCode() == 200)
+			{
+				TSharedPtr<FJsonObject> RootObj;
+				TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+				if (FJsonSerializer::Deserialize(Reader, RootObj) && RootObj.IsValid() && RootObj->HasField(TEXT("login")))
+				{
+					OnUsernameFetched(RootObj->GetStringField(TEXT("login")));
+					return;
+				}
+			}
+			OnUsernameFetched(TEXT("GitHub User"));
+		}
+	);
+	Request->ProcessRequest();
+}
+
+void FCppAiAssistant::FetchCopilotToken(const FString& InAccessToken, TFunction<void(bool, const FString&)> OnTokenFetched)
+{
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(TEXT("https://api.github.com/copilot_internal/v2/token"));
+	Request->SetVerb(TEXT("GET"));
+	Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("token %s"), *InAccessToken));
+	Request->SetHeader(TEXT("Editor-Version"), TEXT("vscode/1.85.0"));
+	Request->SetHeader(TEXT("Editor-Plugin-Version"), TEXT("copilot-chat/0.11.1"));
+	Request->SetHeader(TEXT("User-Agent"), TEXT("GitHubCopilot/1.138.0"));
+	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+
+	Request->OnProcessRequestComplete().BindLambda(
+		[OnTokenFetched](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
+		{
+			if (bSuccess && Response.IsValid() && Response->GetResponseCode() == 200)
+			{
+				TSharedPtr<FJsonObject> RootObj;
+				TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+				if (FJsonSerializer::Deserialize(Reader, RootObj) && RootObj.IsValid() && RootObj->HasField(TEXT("token")))
+				{
+					FString Token = RootObj->GetStringField(TEXT("token"));
+					double ExpiresAt = (double)RootObj->GetIntegerField(TEXT("expires_at"));
+
+					FCppEditorSettings& Settings = FCppEditorSettings::Get();
+					Settings.CopilotSessionToken = Token;
+					Settings.CopilotTokenExpiresAt = ExpiresAt;
+					Settings.Save();
+
+					OnTokenFetched(true, TEXT("Copilot token acquired successfully."));
+					return;
+				}
+			}
+
+			FString Err = Response.IsValid() ? FString::Printf(TEXT("HTTP %d: %s"), Response->GetResponseCode(), *Response->GetContentAsString()) : TEXT("Request failed");
+			OnTokenFetched(false, Err);
+		}
+	);
 	Request->ProcessRequest();
 }

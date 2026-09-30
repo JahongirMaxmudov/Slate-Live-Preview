@@ -70,8 +70,20 @@ private:
 	TSharedPtr<FString> SelectedAiProviderOption;
 	TSharedPtr<STextBlock> AiTestStatusTextBlock;
 
+	// GitHub Copilot Device Auth UI
+	TSharedPtr<SBorder> GitHubCopilotCard;
+	TSharedPtr<STextBlock> GitHubAuthStatusText;
+	TSharedPtr<STextBlock> GitHubUserCodeText;
+	TSharedPtr<SButton> GitHubSignInButton;
+	FString ActiveGitHubUserCode;
+	FString ActiveGitHubVerificationUri;
+
 	void UpdatePreview();
 	void UpdateAiProviderDefaults();
+	void UpdateGitHubAuthCard();
+	FReply OnSignInWithGitHubClicked();
+	FReply OnCopyUserCodeClicked();
+	FReply OnSignOutOfGitHubClicked();
 	FReply OnTestAiConnectionClicked();
 	FReply OnApplyClicked();
 	FReply OnResetClicked();

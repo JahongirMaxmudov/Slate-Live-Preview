@@ -199,6 +199,25 @@ private:
 	void OnIntelliSenseItemDoubleClicked(TSharedPtr<FIntelliSenseItem> Item);
 	FMargin GetIntelliSenseMargin() const;
 
+	// Hover Documentation Card (Quick Info on Hover)
+	TSharedPtr<SBorder> HoverDocCard;
+	TSharedPtr<STextBlock> HoverDocCategoryText;
+	TSharedPtr<STextBlock> HoverDocSignatureText;
+	TSharedPtr<STextBlock> HoverDocDescriptionText;
+	TSharedPtr<SButton> HoverDocUrlButton;
+	FString ActiveHoverDocUrl;
+	FVector2D HoverDocScreenPosition = FVector2D::ZeroVector;
+	FVector2D LastMouseScreenPosition = FVector2D::ZeroVector;
+	double LastMouseMoveTime = 0.0;
+	FString LastHoveredWord;
+	bool bHoverDocVisible = false;
+
+	FMargin GetHoverDocMargin() const;
+	FString GetWordAtScreenPosition(const FVector2D& ScreenPos);
+	void ShowHoverDoc(const FString& Word, const FVector2D& ScreenPos);
+	void DismissHoverDoc();
+	TSharedPtr<FIntelliSenseItem> FindDocItemForWord(const FString& Word) const;
+
 	bool bEnterKeyHandledInKeyDown = false;
 	FReply HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
 	FReply HandleCodeTextBoxKeyChar(const FGeometry& MyGeometry, const FCharacterEvent& InCharacterEvent);

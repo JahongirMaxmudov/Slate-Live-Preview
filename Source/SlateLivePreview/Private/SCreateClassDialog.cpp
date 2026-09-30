@@ -426,7 +426,12 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 		];
 	}
 
-	CommonCardsWidget = CardsGrid;
+	CommonCardsWidget = SNew(SScrollBox)
+		.Orientation(Orient_Vertical)
+		+ SScrollBox::Slot()
+		[
+			CardsGrid
+		];
 
 	// 2. Build Virtualized Searchable List for Engine and Project Classes
 	ListBrowserWidget = SNew(SBox)
@@ -556,11 +561,17 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 			.Padding(0.0f, 0.0f, 0.0f, 8.0f)
 			[
 				SNew(SBox)
-				.MaxDesiredHeight(230.0f)
+				.HeightOverride(210.0f)
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight() [ CommonCardsWidget.ToSharedRef() ]
-					+ SVerticalBox::Slot().AutoHeight() [ ListBrowserWidget.ToSharedRef() ]
+					SNew(SOverlay)
+					+ SOverlay::Slot()
+					[
+						CommonCardsWidget.ToSharedRef()
+					]
+					+ SOverlay::Slot()
+					[
+						ListBrowserWidget.ToSharedRef()
+					]
 				]
 			]
 
@@ -1332,7 +1343,7 @@ void SCreateClassDialog::OpenModal(const FString& InDefaultDir, FOnClassCreated 
 {
 	TSharedRef<SWindow> ModalWindow = SNew(SWindow)
 		.Title(FText::FromString(TEXT("Add C++ Class - C++ Studio")))
-		.ClientSize(FVector2D(860.0f, 660.0f))
+		.ClientSize(FVector2D(880.0f, 720.0f))
 		.SupportsMaximize(false)
 		.SupportsMinimize(false)
 		.SizingRule(ESizingRule::FixedSize);

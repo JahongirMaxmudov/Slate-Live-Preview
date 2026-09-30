@@ -522,12 +522,40 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 							SNew(SVerticalBox)
 							+ SVerticalBox::Slot()
 							.AutoHeight()
-							.Padding(2.0f)
+							.Padding(4.0f, 2.0f)
 							[
-								SNew(STextBlock)
-								.Text(FText::FromString(TEXT("Live Slate Viewport:")))
-								.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
-								.ColorAndOpacity(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f))
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot()
+								.FillWidth(1.0f)
+								.VAlign(VAlign_Center)
+								[
+									SNew(STextBlock)
+									.Text(FText::FromString(TEXT("Live Slate Viewport:")))
+									.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
+									.ColorAndOpacity(FLinearColor(0.2f, 0.8f, 1.0f, 1.0f))
+								]
+
+								// Close [X] Button to hide Slate Viewport
+								+ SHorizontalBox::Slot()
+								.AutoWidth()
+								.VAlign(VAlign_Center)
+								.Padding(2.0f, 0.0f)
+								[
+									SNew(SButton)
+									.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+									.ContentPadding(FMargin(2.0f))
+									.ToolTipText(FText::FromString(TEXT("Hide Live Slate Viewport")))
+									.OnClicked_Lambda([this]() -> FReply
+									{
+										ToggleSlatePreview(false);
+										return FReply::Handled();
+									})
+									[
+										SNew(SImage)
+										.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.CloseTab")))
+										.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+									]
+								]
 							]
 							+ SVerticalBox::Slot()
 							.FillHeight(1.0f)

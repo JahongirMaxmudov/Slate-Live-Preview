@@ -19,6 +19,8 @@
 #include "DesktopPlatformModule.h"
 #include "SlateLivePreviewStyle.h"
 #include "CppAiAssistant.h"
+#include "HAL/PlatformApplicationMisc.h"
+#include "HAL/PlatformProcess.h"
 
 static const TCHAR* SettingsSampleCode = 
 	TEXT("#include \"CoreMinimal.h\"\n")
@@ -698,6 +700,121 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 							]
 						]
 
+						// GitHub Copilot Device Authorization Card (visible when GitHubCopilot is selected)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 6.0f)
+						[
+							SAssignNew(GitHubCopilotCard, SBorder)
+							.BorderImage(FAppStyle::Get().GetBrush("ToolPanel.GroupBorder"))
+							.BorderBackgroundColor(FLinearColor(0.10f, 0.14f, 0.20f, 1.0f))
+							.Padding(8.0f)
+							.Visibility_Lambda([this]()
+							{
+								return (TempAiProvider == EAiProvider::GitHubCopilot) ? EVisibility::Visible : EVisibility::Collapsed;
+							})
+							[
+								SNew(SVerticalBox)
+
+								// Status Header
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 4.0f)
+								[
+									SNew(SHorizontalBox)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+									[
+										SNew(SImage)
+										.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.AiSparkle")))
+										.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+									]
+									+ SHorizontalBox::Slot()
+									.FillWidth(1.0f)
+									.VAlign(VAlign_Center)
+									[
+										SAssignNew(GitHubAuthStatusText, STextBlock)
+										.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9.0f))
+										.ColorAndOpacity_Lambda([this]()
+										{
+											return FCppAiAssistant::Get().IsGitHubAuthenticated() ? FLinearColor(0.35f, 0.88f, 0.50f, 1.0f) : FLinearColor(0.9f, 0.9f, 0.95f, 1.0f);
+										})
+										.Text_Lambda([this]() -> FText
+										{
+											const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+											if (FCppAiAssistant::Get().IsGitHubAuthenticated())
+											{
+												FString User = Settings.GitHubUsername.IsEmpty() ? TEXT("Authorized Account") : Settings.GitHubUsername;
+												return FText::FromString(FString::Printf(TEXT("Signed in to GitHub as %s (Copilot Active)"), *User));
+											}
+											if (!ActiveGitHubUserCode.IsEmpty())
+											{
+												return FText::FromString(TEXT("Waiting for approval at github.com/login/device..."));
+											}
+											return FText::FromString(TEXT("Authenticate via GitHub OAuth (VS Code Device Flow):"));
+										})
+									]
+								]
+
+								// Actions row
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 4.0f, 0.0f, 0.0f)
+								[
+									SNew(SHorizontalBox)
+
+									// Sign In Button
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+									[
+										SAssignNew(GitHubSignInButton, SButton)
+										.ButtonStyle(FAppStyle::Get(), "PrimaryButton")
+										.Text_Lambda([this]()
+										{
+											return FCppAiAssistant::Get().IsGitHubAuthenticated() ? FText::FromString(TEXT("Re-authenticate")) : FText::FromString(TEXT("Sign in with GitHub (Device Flow)"));
+										})
+										.ToolTipText(FText::FromString(TEXT("Opens github.com/login/device with a verification code, exactly like in VS Code Copilot")))
+										.OnClicked(this, &SCppSettingsDialog::OnSignInWithGitHubClicked)
+									]
+
+									// Copy Code Button (appears during device flow)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+									[
+										SNew(SButton)
+										.Visibility_Lambda([this]()
+										{
+											return ActiveGitHubUserCode.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible;
+										})
+										.Text_Lambda([this]()
+										{
+											return FText::FromString(FString::Printf(TEXT("Copy Code [%s]"), *ActiveGitHubUserCode));
+										})
+										.ToolTipText(FText::FromString(TEXT("Copy verification code and open browser authorization page")))
+										.OnClicked(this, &SCppSettingsDialog::OnCopyUserCodeClicked)
+									]
+
+									// Sign Out Button
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									[
+										SNew(SButton)
+										.Visibility_Lambda([this]()
+										{
+											return FCppAiAssistant::Get().IsGitHubAuthenticated() ? EVisibility::Visible : EVisibility::Collapsed;
+										})
+										.Text(FText::FromString(TEXT("Sign Out")))
+										.ToolTipText(FText::FromString(TEXT("Disconnect stored GitHub Copilot credentials")))
+										.OnClicked(this, &SCppSettingsDialog::OnSignOutOfGitHubClicked)
+									]
+								]
+							]
+						]
+
 						// Endpoint URL
 						+ SVerticalBox::Slot()
 						.AutoHeight()
@@ -919,6 +1036,70 @@ void SCppSettingsDialog::UpdateAiProviderDefaults()
 	{
 		TempAiApiKey.Empty();
 	}
+	else if (TempAiProvider == EAiProvider::GitHubCopilot)
+	{
+		const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+		TempAiApiKey = Settings.GitHubAccessToken;
+	}
+}
+
+void SCppSettingsDialog::UpdateGitHubAuthCard()
+{
+	// Status text and button labels update via Lambdas
+}
+
+FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
+{
+	ActiveGitHubUserCode.Empty();
+	ActiveGitHubVerificationUri.Empty();
+
+	if (GitHubAuthStatusText.IsValid())
+	{
+		GitHubAuthStatusText->SetText(FText::FromString(TEXT("Connecting to GitHub...")));
+	}
+
+	FCppAiAssistant::Get().StartGitHubDeviceFlow(
+		FOnGitHubDeviceCodeReceived::CreateLambda([this](const FString& UserCode, const FString& Uri)
+		{
+			ActiveGitHubUserCode = UserCode;
+			ActiveGitHubVerificationUri = Uri;
+		}),
+		FOnGitHubAuthComplete::CreateLambda([this](bool bSuccess, const FString& MessageOrUser)
+		{
+			ActiveGitHubUserCode.Empty();
+			if (bSuccess)
+			{
+				const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+				TempAiApiKey = Settings.GitHubAccessToken;
+				TempAiEndpoint = Settings.AiEndpoint;
+				TempAiModel = Settings.AiModel;
+			}
+		})
+	);
+
+	return FReply::Handled();
+}
+
+FReply SCppSettingsDialog::OnCopyUserCodeClicked()
+{
+	if (!ActiveGitHubUserCode.IsEmpty())
+	{
+		FPlatformApplicationMisc::ClipboardCopy(*ActiveGitHubUserCode);
+	}
+	if (!ActiveGitHubVerificationUri.IsEmpty())
+	{
+		FPlatformProcess::LaunchURL(*ActiveGitHubVerificationUri, nullptr, nullptr);
+	}
+	return FReply::Handled();
+}
+
+FReply SCppSettingsDialog::OnSignOutOfGitHubClicked()
+{
+	FCppAiAssistant::Get().SignOutOfGitHub();
+	ActiveGitHubUserCode.Empty();
+	ActiveGitHubVerificationUri.Empty();
+	TempAiApiKey.Empty();
+	return FReply::Handled();
 }
 
 FReply SCppSettingsDialog::OnTestAiConnectionClicked()
@@ -967,6 +1148,10 @@ FReply SCppSettingsDialog::OnApplyClicked()
 	Settings.AiEndpoint = TempAiEndpoint;
 	Settings.AiModel = TempAiModel;
 	Settings.AiApiKey = TempAiApiKey;
+	if (TempAiProvider == EAiProvider::GitHubCopilot && !TempAiApiKey.IsEmpty())
+	{
+		Settings.GitHubAccessToken = TempAiApiKey;
+	}
 	Settings.AiGhostTextDelayMs = TempAiGhostTextDelayMs;
 
 	Settings.Save();

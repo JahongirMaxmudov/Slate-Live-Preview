@@ -57,6 +57,7 @@ enum class EAiProvider : uint8
 	LMStudio,
 	DeepSeek,
 	OpenAI,
+	GitHubCopilot,
 	Custom,
 	Count
 };
@@ -95,6 +96,10 @@ public:
 	FString AiEndpoint = TEXT("http://localhost:11434/v1");
 	FString AiModel = TEXT("deepseek-coder");
 	FString AiApiKey;
+	FString GitHubAccessToken;
+	FString GitHubUsername;
+	FString CopilotSessionToken;
+	double CopilotTokenExpiresAt = 0.0;
 	int32 AiGhostTextDelayMs = 400;
 	int32 AiMaxTokens = 128;
 	float AiTemperature = 0.2f;

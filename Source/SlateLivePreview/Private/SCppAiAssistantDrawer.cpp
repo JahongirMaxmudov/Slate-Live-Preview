@@ -86,6 +86,10 @@ void SCppAiAssistantDrawer::Construct(const FArguments& InArgs)
 						.Text_Lambda([]()
 						{
 							const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+							if (Settings.AiProvider == EAiProvider::GitHubCopilot)
+							{
+								return FText::FromString(TEXT("Copilot (") + (Settings.AiModel.IsEmpty() ? TEXT("gpt-4o") : Settings.AiModel) + TEXT(")"));
+							}
 							return FText::FromString(Settings.AiModel.IsEmpty() ? TEXT("Ollama") : Settings.AiModel);
 						})
 						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8))
