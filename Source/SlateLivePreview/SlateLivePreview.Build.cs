@@ -30,6 +30,7 @@ public class SlateLivePreview : ModuleRules
 				"ImageWrapper",
 				"RenderCore",
 				"ApplicationCore",
+				"Projects",
 			}
 		);
 

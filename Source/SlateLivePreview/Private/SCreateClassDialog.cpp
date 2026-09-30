@@ -19,6 +19,8 @@
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 #include "CppSyntaxHighlighter.h"
+#include "SlateLivePreviewStyle.h"
+#include "Widgets/Images/SImage.h"
 
 FString SCreateClassDialog::GetDefaultNameForTemplate(EClassTemplateType InTemplate)
 {
@@ -150,21 +152,21 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 	struct FTemplateCardInfo
 	{
 		EClassTemplateType Template;
-		FString Icon;
+		FName IconBrush;
 		FString Title;
 		FString Description;
 	};
 
 	const TArray<FTemplateCardInfo> Cards = {
-		{ EClassTemplateType::Character,            TEXT("🏃"), TEXT("Character"),       TEXT("An Actor that includes the ability to walk around.") },
-		{ EClassTemplateType::Pawn,                 TEXT("♟️"),  TEXT("Pawn"),            TEXT("An Actor that can be controlled by players or AI.") },
-		{ EClassTemplateType::AActorClass,          TEXT("🎭"), TEXT("Actor"),           TEXT("An object that can be placed or spawned in the world.") },
-		{ EClassTemplateType::UActorComponentClass, TEXT("🧩"), TEXT("Actor Component"), TEXT("A reusable component that can be added to any Actor.") },
-		{ EClassTemplateType::SceneComponent,       TEXT("📐"), TEXT("Scene Component"), TEXT("A component with a transform and hierarchy attachment.") },
-		{ EClassTemplateType::SlateWidget,          TEXT("🖥️"), TEXT("Slate Widget"),    TEXT("Custom SCompoundWidget UI element with declarative syntax.") },
-		{ EClassTemplateType::UObjectClass,         TEXT("📦"), TEXT("UObject"),         TEXT("The base class of Unreal Engine objects with reflection.") },
-		{ EClassTemplateType::UStructType,          TEXT("🏷️"),  TEXT("UStruct"),         TEXT("A reflected value type struct marked with BlueprintType.") },
-		{ EClassTemplateType::EmptyCppClass,        TEXT("📄"), TEXT("Empty C++"),       TEXT("A standard C++ class without Unreal inheritance.") },
+		{ EClassTemplateType::Character,            TEXT("SlateLivePreview.Class.Character"),      TEXT("Character"),       TEXT("An Actor that includes the ability to walk around.") },
+		{ EClassTemplateType::Pawn,                 TEXT("SlateLivePreview.Class.Pawn"),           TEXT("Pawn"),            TEXT("An Actor that can be controlled by players or AI.") },
+		{ EClassTemplateType::AActorClass,          TEXT("SlateLivePreview.Class.Actor"),          TEXT("Actor"),           TEXT("An object that can be placed or spawned in the world.") },
+		{ EClassTemplateType::UActorComponentClass, TEXT("SlateLivePreview.Class.Component"),      TEXT("Actor Component"), TEXT("A reusable component that can be added to any Actor.") },
+		{ EClassTemplateType::SceneComponent,       TEXT("SlateLivePreview.Class.SceneComponent"), TEXT("Scene Component"), TEXT("A component with a transform and hierarchy attachment.") },
+		{ EClassTemplateType::SlateWidget,          TEXT("SlateLivePreview.Class.SlateWidget"),    TEXT("Slate Widget"),    TEXT("Custom SCompoundWidget UI element with declarative syntax.") },
+		{ EClassTemplateType::UObjectClass,         TEXT("SlateLivePreview.Class.UObject"),        TEXT("UObject"),         TEXT("The base class of Unreal Engine objects with reflection.") },
+		{ EClassTemplateType::UStructType,          TEXT("SlateLivePreview.Class.UStruct"),        TEXT("UStruct"),         TEXT("A reflected value type struct marked with BlueprintType.") },
+		{ EClassTemplateType::EmptyCppClass,        TEXT("SlateLivePreview.Class.EmptyCpp"),       TEXT("Empty C++"),       TEXT("A standard C++ class without Unreal inheritance.") },
 	};
 
 	TSharedRef<SUniformGridPanel> CardsGrid = SNew(SUniformGridPanel).SlotPadding(FMargin(3.0f));
@@ -220,9 +222,9 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 							.VAlign(VAlign_Center)
 							.Padding(0.0f, 0.0f, 6.0f, 0.0f)
 							[
-								SNew(STextBlock)
-								.Text(FText::FromString(Card.Icon))
-								.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(Card.IconBrush))
+								.DesiredSizeOverride(FVector2D(18.0f, 18.0f))
 							]
 							+ SHorizontalBox::Slot()
 							.FillWidth(1.0f)
@@ -387,10 +389,20 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
 					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("🔷 Header File (.h):")))
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8.5f))
-						.ColorAndOpacity(FLinearColor(0.35f, 0.75f, 1.0f, 1.0f))
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 4.0f, 0.0f)
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Tree.HeaderFile")))
+							.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("Header File (.h):")))
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8.5f))
+							.ColorAndOpacity(FLinearColor(0.35f, 0.75f, 1.0f, 1.0f))
+						]
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f)
 					[
@@ -408,10 +420,20 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().Padding(2.0f)
 					[
-						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("⚡ Source File (.cpp):")))
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8.5f))
-						.ColorAndOpacity(FLinearColor(0.45f, 0.90f, 0.55f, 1.0f))
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 4.0f, 0.0f)
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Tree.SourceFile")))
+							.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("Source File (.cpp):")))
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8.5f))
+							.ColorAndOpacity(FLinearColor(0.45f, 0.90f, 0.55f, 1.0f))
+						]
 					]
 					+ SVerticalBox::Slot().FillHeight(1.0f)
 					[
@@ -455,8 +477,23 @@ void SCreateClassDialog::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.ButtonColorAndOpacity(FLinearColor(0.12f, 0.52f, 0.95f, 1.0f))
-					.Text(FText::FromString(TEXT("🚀 Create Class")))
+					.ContentPadding(FMargin(8.0f, 3.0f))
 					.OnClicked(this, &SCreateClassDialog::OnCreateClicked)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 5.0f, 0.0f)
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.NewClass")))
+							.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("Create Class")))
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9.0f))
+						]
+					]
 				]
 			]
 		]
@@ -836,7 +873,7 @@ void SCreateClassDialog::UpdateGeneratedCode()
 		ResolveClassAndFileNames(SelectedTemplate, ClassNameInput, ClassName, BaseName, HeaderFileName, SourceFileName);
 
 		PathPreviewTextBlock->SetText(FText::FromString(
-			FString::Printf(TEXT("✨ Class: %s  |  🔷 Header: %s  |  ⚡ Source: %s"),
+			FString::Printf(TEXT("Class: %s  |  Header: %s  |  Source: %s"),
 				*ClassName, *FPaths::GetCleanFilename(HeaderPath), *FPaths::GetCleanFilename(SourcePath))
 		));
 	}

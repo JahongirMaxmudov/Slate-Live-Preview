@@ -9,6 +9,8 @@
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
 
+#include "SlateLivePreviewStyle.h"
+
 #define LOCTEXT_NAMESPACE "SlateLivePreviewModule"
 
 const FName FSlateLivePreviewModule::TabName(TEXT("SlateLivePreviewTab"));
@@ -16,6 +18,9 @@ const FName FSlateLivePreviewModule::CppStudioTabName(TEXT("CppStudioTab"));
 
 void FSlateLivePreviewModule::StartupModule()
 {
+	// 0. Initialize Custom Slate Style Set
+	FSlateLivePreviewStyle::Initialize();
+
 	// 1. Register Slate Live Preview Tab
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
 		TabName,
@@ -24,7 +29,7 @@ void FSlateLivePreviewModule::StartupModule()
 	.SetDisplayName(LOCTEXT("SlateLivePreviewTabTitle", "Slate Live Preview"))
 	.SetTooltipText(LOCTEXT("SlateLivePreviewTabTooltip", "Open Live Slate UI Preview Window."))
 	.SetGroup(WorkspaceMenu::GetMenuStructure().GetDeveloperToolsMiscCategory())
-	.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Layout"));
+	.SetIcon(FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), "SlateLivePreview.SlatePreview"));
 
 	// 2. Register In-Engine C++ Studio Tab
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
@@ -34,7 +39,7 @@ void FSlateLivePreviewModule::StartupModule()
 	.SetDisplayName(LOCTEXT("CppStudioTabTitle", "In-Engine C++ Studio"))
 	.SetTooltipText(LOCTEXT("CppStudioTabTooltip", "Lightweight in-editor C++ code editor and Live Coding interface."))
 	.SetGroup(WorkspaceMenu::GetMenuStructure().GetDeveloperToolsMiscCategory())
-	.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Adjust"));
+	.SetIcon(FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), "SlateLivePreview.SplitView"));
 
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FSlateLivePreviewModule::RegisterMenus));
 
@@ -51,6 +56,8 @@ void FSlateLivePreviewModule::ShutdownModule()
 
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(CppStudioTabName);
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(TabName);
+
+	FSlateLivePreviewStyle::Shutdown();
 
 	UE_LOG(LogTemp, Log, TEXT("SlateLivePreview & CppStudio module shut down."));
 }
@@ -94,7 +101,7 @@ void FSlateLivePreviewModule::RegisterMenus()
 		TEXT("CppStudio"),
 		LOCTEXT("CppStudioEntry", "In-Engine C++ Studio"),
 		LOCTEXT("CppStudioEntryTooltip", "Lightweight in-editor C++ code editor with Live Coding hot-reloading."),
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Adjust"),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), "SlateLivePreview.SplitView"),
 		FUIAction(FExecuteAction::CreateRaw(this, &FSlateLivePreviewModule::OpenCppStudioTab))
 	);
 
@@ -103,7 +110,7 @@ void FSlateLivePreviewModule::RegisterMenus()
 		TEXT("SlateLivePreview"),
 		LOCTEXT("SlateLivePreviewEntry", "Slate Live Preview"),
 		LOCTEXT("SlateLivePreviewEntryTooltip", "Instant live Slate UI previewer with zero-compilation AST interpreter."),
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Layout"),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), "SlateLivePreview.SlatePreview"),
 		FUIAction(FExecuteAction::CreateRaw(this, &FSlateLivePreviewModule::OpenLivePreviewTab))
 	);
 }

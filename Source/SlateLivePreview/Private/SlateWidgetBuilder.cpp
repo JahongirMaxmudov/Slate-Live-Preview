@@ -828,7 +828,7 @@ TSharedRef<SWidget> FSlateWidgetBuilder::BuildErrorWidget(const TArray<FString>&
 		.Padding(0.0f, 0.0f, 0.0f, 8.0f)
 		[
 			SNew(STextBlock)
-			.Text(FText::FromString(TEXT("⚠ Syntax / Parsing Diagnostics")))
+			.Text(FText::FromString(TEXT("Syntax / Parsing Diagnostics")))
 			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
 			.ColorAndOpacity(FLinearColor(1.0f, 0.3f, 0.3f, 1.0f))
 		];

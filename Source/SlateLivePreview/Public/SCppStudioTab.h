@@ -48,6 +48,7 @@ private:
 	TWeakPtr<SCppEditorPane> ActiveEditorPane;
 
 	TSharedPtr<STextBlock> FileHeaderTextBlock;
+	TSharedPtr<SImage> StatusBadgeIcon;
 	TSharedPtr<STextBlock> StatusBadgeTextBlock;
 	TSharedPtr<SMultiLineEditableTextBox> OutputConsoleTextBox;
 	TSharedPtr<SSlateLivePreviewViewport> SlatePreviewViewport;
@@ -65,6 +66,7 @@ private:
 
 	// Compiler Error Navigation
 	TSharedPtr<SButton> ErrorJumpButton;
+	TSharedPtr<SImage> ErrorJumpIcon;
 	TSharedPtr<STextBlock> ErrorJumpTextBlock;
 	FString LastParsedErrorFile;
 	int32 LastParsedErrorLine = 0;

@@ -1,10 +1,12 @@
 // Copyright (c) 2026 Antigravity & User. All Rights Reserved.
 
 #include "SCppStudioTab.h"
+#include "SlateLivePreviewStyle.h"
 #include "SlateParser.h"
 #include "SlateWidgetBuilder.h"
 #include "ILiveCodingModule.h"
 #include "SCreateClassDialog.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SSplitter.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -34,8 +36,12 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 		.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10))
 		.ColorAndOpacity(FLinearColor::White);
 
+	StatusBadgeIcon = SNew(SImage)
+		.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Status.Ready")))
+		.DesiredSizeOverride(FVector2D(12.0f, 12.0f));
+
 	StatusBadgeTextBlock = SNew(STextBlock)
-		.Text(FText::FromString(TEXT("● Ready")))
+		.Text(FText::FromString(TEXT("Ready")))
 		.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
 		.ColorAndOpacity(FLinearColor(0.4f, 0.8f, 0.4f, 1.0f));
 
@@ -136,7 +142,20 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 					.VAlign(VAlign_Center)
 					.Padding(12.0f, 0.0f)
 					[
-						StatusBadgeTextBlock.ToSharedRef()
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+						[
+							StatusBadgeIcon.ToSharedRef()
+						]
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							StatusBadgeTextBlock.ToSharedRef()
+						]
 					]
 
 					+ SHorizontalBox::Slot()
@@ -145,102 +164,246 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 						SNew(SSpacer)
 					]
 
-					// ➕ New Class Wizard (Ctrl+N)
+					// 1. New Class Wizard (Ctrl+N)
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.ButtonColorAndOpacity(FLinearColor(0.2f, 0.55f, 0.35f, 1.0f))
-						.Text(FText::FromString(TEXT("➕ New Class (Ctrl+N)")))
+						.ButtonColorAndOpacity(FLinearColor(0.18f, 0.45f, 0.3f, 1.0f))
 						.ToolTipText(FText::FromString(TEXT("Create a new Slate Widget, UObject, Actor, Component or Struct with full boilerplate (Ctrl+N)")))
 						.OnClicked(this, &SCppStudioTab::OnNewClassClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.NewClass")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("New Class (Ctrl+N)")))
+							]
+						]
 					]
 
-					// 🔍 Quick Open (Ctrl+P)
+					// 2. Quick Open (Ctrl+P)
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.Text(FText::FromString(TEXT("🔍 Quick Open (Ctrl+P)")))
 						.ToolTipText(FText::FromString(TEXT("Quickly search and jump to any project C++ file (Ctrl+P)")))
 						.OnClicked(this, &SCppStudioTab::OnQuickOpenClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.QuickOpen")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Quick Open (Ctrl+P)")))
+							]
+						]
 					]
 
-					// 💾 Save Current File
+					// 3. Save Current File
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.Text(FText::FromString(TEXT("💾 Save (Ctrl+S)")))
 						.ToolTipText(FText::FromString(TEXT("Save currently active file to disk")))
 						.OnClicked(this, &SCppStudioTab::OnSaveClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Save")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Save (Ctrl+S)")))
+							]
+						]
 					]
 
-					// 💾 Save All Files
+					// 4. Save All Files
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.Text(FText::FromString(TEXT("💾 Save All")))
 						.ToolTipText(FText::FromString(TEXT("Save all open dirty files across all editor tabs")))
 						.OnClicked(this, &SCppStudioTab::OnSaveAllClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.SaveAll")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Save All")))
+							]
+						]
 					]
 
-					// ⚡ Live Coding Button
+					// 5. Live Coding Button
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.ButtonColorAndOpacity(FLinearColor(0.1f, 0.45f, 0.85f, 1.0f))
-						.Text(FText::FromString(TEXT("⚡ Live Coding (Ctrl+B)")))
+						.ButtonColorAndOpacity(FLinearColor(0.12f, 0.38f, 0.72f, 1.0f))
 						.ToolTipText(FText::FromString(TEXT("Save all files and hot-patch C++ code into the running editor")))
 						.OnClicked(this, &SCppStudioTab::OnLiveCodingClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.LiveCoding")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Live Coding (Ctrl+B)")))
+							]
+						]
 					]
 
-					// 🔄 Revert Button
+					// 6. Revert Button
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.Text(FText::FromString(TEXT("🔄 Revert")))
 						.ToolTipText(FText::FromString(TEXT("Discard unsaved changes in active file and reload from disk")))
 						.OnClicked(this, &SCppStudioTab::OnRevertClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Revert")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Revert")))
+							]
+						]
 					]
 
-					// ◫ Split View Toggle
+					// 7. Split View Toggle
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.Text(FText::FromString(TEXT("◫ Split View")))
 						.ToolTipText(FText::FromString(TEXT("Toggle Dual-Pane Split View to view two files (.h and .cpp) side-by-side")))
 						.OnClicked(this, &SCppStudioTab::OnToggleSplitClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.SplitView")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Split View")))
+							]
+						]
 					]
 
-					// 👁 Slate Preview Toggle
+					// 8. Slate Preview Toggle
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.VAlign(VAlign_Center)
 					.Padding(2.0f)
 					[
 						SNew(SButton)
-						.Text(FText::FromString(TEXT("👁 Slate Preview")))
 						.ToolTipText(FText::FromString(TEXT("Toggle live Slate preview viewport on the right")))
 						.OnClicked(this, &SCppStudioTab::OnTogglePreviewClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.SlatePreview")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Slate Preview")))
+							]
+						]
 					]
 				]
 			]
@@ -328,7 +491,7 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 							.VAlign(VAlign_Center)
 							[
 								SNew(STextBlock)
-								.Text(FText::FromString(TEXT("💻 Output / Live Coding Console:")))
+								.Text(FText::FromString(TEXT("Output / Live Coding Console:")))
 								.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
 								.ColorAndOpacity(FLinearColor(0.8f, 0.8f, 0.8f, 1.0f))
 							]
@@ -346,9 +509,24 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 								.ToolTipText(FText::FromString(TEXT("Jump to compiler error in source code (F4)")))
 								.OnClicked(this, &SCppStudioTab::OnErrorJumpClicked)
 								[
-									SAssignNew(ErrorJumpTextBlock, STextBlock)
-									.Text(FText::FromString(TEXT("❌ Jump to Error (F4)")))
-									.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
+									SNew(SHorizontalBox)
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+									[
+										SAssignNew(ErrorJumpIcon, SImage)
+										.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Status.ErrorJump")))
+										.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+									]
+									+ SHorizontalBox::Slot()
+									.AutoWidth()
+									.VAlign(VAlign_Center)
+									[
+										SAssignNew(ErrorJumpTextBlock, STextBlock)
+										.Text(FText::FromString(TEXT("Jump to Error (F4)")))
+										.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
+									]
 								]
 							]
 
@@ -486,7 +664,7 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 					.Padding(4.0f, 2.0f)
 					[
 						SNew(STextBlock)
-						.Text(FText::FromString(TEXT("↑↓ Navigate | Enter Open | Esc Close")))
+						.Text(FText::FromString(TEXT("Up/Down Navigate | Enter Open | Esc Close")))
 						.Font(FCoreStyle::GetDefaultFontStyle("Italic", 8))
 						.ColorAndOpacity(FLinearColor(0.5f, 0.5f, 0.5f, 1.0f))
 					]
@@ -634,7 +812,7 @@ void SCppStudioTab::OnFilesRenamedInTree(const FString& OldPath, const FString& 
 			RightEditorPane->OpenFile(NewPath);
 		}
 	}
-	SetStatus(TEXT("✓ Renamed successfully"), FLinearColor(0.2f, 0.9f, 0.4f, 1.0f));
+	SetStatus(TEXT("Renamed successfully"), FLinearColor(0.2f, 0.9f, 0.4f, 1.0f));
 	AppendLog(FString::Printf(TEXT("[Refactor] Renamed %s -> %s"), *FPaths::GetCleanFilename(OldPath), *FPaths::GetCleanFilename(NewPath)));
 	UpdateFileHeader();
 }
@@ -650,7 +828,7 @@ void SCppStudioTab::OnFileDeletedInTree(const FString& DeletedPath)
 	{
 		RightEditorPane->CloseFile(DeletedPath);
 	}
-	SetStatus(TEXT("🗑️ Deleted file"), FLinearColor(0.9f, 0.4f, 0.2f, 1.0f));
+	SetStatus(TEXT("Deleted file"), FLinearColor(0.9f, 0.4f, 0.2f, 1.0f));
 	UpdateFileHeader();
 }
 
@@ -668,7 +846,7 @@ void SCppStudioTab::Tick(const FGeometry& AllottedGeometry, const double InCurre
 			// Compiling just finished!
 			if (!bPatchSucceeded)
 			{
-				SetStatus(TEXT("❌ Compile Failed"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
+				SetStatus(TEXT("Compile Failed"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
 				AppendLog(TEXT("[Live Coding] Compilation failed. See Output Log for compiler errors."));
 			}
 			bPatchSucceeded = false;
@@ -690,11 +868,11 @@ void SCppStudioTab::SaveCurrentFile()
 	{
 		if (ActivePane->SaveCurrentFile())
 		{
-			SetStatus(TEXT("✓ Saved"), FLinearColor(0.2f, 0.8f, 0.4f, 1.0f));
+			SetStatus(TEXT("Saved"), FLinearColor(0.2f, 0.8f, 0.4f, 1.0f));
 		}
 		else
 		{
-			SetStatus(TEXT("❌ Save Failed"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
+			SetStatus(TEXT("Save Failed"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
 		}
 		UpdateFileHeader();
 		UpdateSlatePreviewIfApplicable();
@@ -708,12 +886,12 @@ void SCppStudioTab::SaveAllFiles()
 
 	if (bLeftOk && bRightOk)
 	{
-		SetStatus(TEXT("✓ All Saved"), FLinearColor(0.2f, 0.8f, 0.4f, 1.0f));
+		SetStatus(TEXT("All Saved"), FLinearColor(0.2f, 0.8f, 0.4f, 1.0f));
 		AppendLog(TEXT("[File] All open documents saved."));
 	}
 	else
 	{
-		SetStatus(TEXT("❌ Save All Failed"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
+		SetStatus(TEXT("Save All Failed"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
 	}
 	UpdateFileHeader();
 	UpdateSlatePreviewIfApplicable();
@@ -735,13 +913,13 @@ void SCppStudioTab::TriggerLiveCoding()
 
 		bPatchSucceeded = false;
 		bWasLiveCodingCompiling = true;
-		SetStatus(TEXT("⚡ Live Coding Compiling..."), FLinearColor(1.0f, 0.8f, 0.2f, 1.0f));
+		SetStatus(TEXT("Live Coding Compiling..."), FLinearColor(1.0f, 0.8f, 0.2f, 1.0f));
 		AppendLog(TEXT("[Live Coding] Compile requested..."));
 		LiveCoding->Compile();
 	}
 	else
 	{
-		SetStatus(TEXT("❌ Live Coding Unavailable"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
+		SetStatus(TEXT("Live Coding Unavailable"), FLinearColor(1.0f, 0.3f, 0.3f, 1.0f));
 		AppendLog(TEXT("[Live Coding] Module not found or inactive."));
 	}
 }
@@ -819,7 +997,7 @@ void SCppStudioTab::ToggleSplitView()
 void SCppStudioTab::OnPatchComplete()
 {
 	bPatchSucceeded = true;
-	SetStatus(TEXT("✓ Patch Applied!"), FLinearColor(0.2f, 0.9f, 0.4f, 1.0f));
+	SetStatus(TEXT("Patch Applied!"), FLinearColor(0.2f, 0.9f, 0.4f, 1.0f));
 	AppendLog(TEXT("[Live Coding] Patch successfully built and loaded!"));
 }
 
@@ -852,10 +1030,39 @@ void SCppStudioTab::UpdateFileHeader()
 
 void SCppStudioTab::SetStatus(const FString& StatusText, const FLinearColor& StatusColor)
 {
+	FString CleanText = StatusText;
+	CleanText.ReplaceInline(TEXT("✓ "), TEXT(""));
+	CleanText.ReplaceInline(TEXT("❌ "), TEXT(""));
+	CleanText.ReplaceInline(TEXT("⚡ "), TEXT(""));
+	CleanText.ReplaceInline(TEXT("🗑️ "), TEXT(""));
+	CleanText.ReplaceInline(TEXT("● "), TEXT(""));
+
 	if (StatusBadgeTextBlock.IsValid())
 	{
-		StatusBadgeTextBlock->SetText(FText::FromString(StatusText));
+		StatusBadgeTextBlock->SetText(FText::FromString(CleanText));
 		StatusBadgeTextBlock->SetColorAndOpacity(StatusColor);
+	}
+
+	if (StatusBadgeIcon.IsValid())
+	{
+		FName IconBrushName = TEXT("SlateLivePreview.Status.Ready");
+		if (StatusText.Contains(TEXT("Compil")) || StatusText.Contains(TEXT("Live Coding")))
+		{
+			IconBrushName = TEXT("SlateLivePreview.Status.Compiling");
+		}
+		else if (StatusText.Contains(TEXT("Fail")) || StatusText.Contains(TEXT("Unavailable")) || StatusText.Contains(TEXT("Error")))
+		{
+			IconBrushName = TEXT("SlateLivePreview.Status.Failed");
+		}
+		else if (StatusText.Contains(TEXT("Saved")) || StatusText.Contains(TEXT("Applied")) || StatusText.Contains(TEXT("Created")) || StatusText.Contains(TEXT("Renamed")) || StatusText.Contains(TEXT("Success")))
+		{
+			IconBrushName = TEXT("SlateLivePreview.Status.Success");
+		}
+		else if (StatusText.Contains(TEXT("Delete")))
+		{
+			IconBrushName = TEXT("SlateLivePreview.Delete");
+		}
+		StatusBadgeIcon->SetImage(FSlateLivePreviewStyle::GetBrush(IconBrushName));
 	}
 }
 
@@ -1018,7 +1225,7 @@ void SCppStudioTab::OnClassCreated(const FString& HeaderPath, const FString& Cpp
 		}
 	}
 
-	SetStatus(FString::Printf(TEXT("✓ Created: %s"), *FPaths::GetBaseFilename(HeaderPath)), FLinearColor(0.2f, 0.85f, 0.4f, 1.0f));
+	SetStatus(FString::Printf(TEXT("Created: %s"), *FPaths::GetBaseFilename(HeaderPath)), FLinearColor(0.2f, 0.85f, 0.4f, 1.0f));
 	AppendLog(FString::Printf(TEXT("[Wizard] Successfully created %s and %s"), *FPaths::GetCleanFilename(HeaderPath), *FPaths::GetCleanFilename(CppPath)));
 }
 
@@ -1300,7 +1507,7 @@ void SCppStudioTab::CheckAndParseErrorLine(const FString& InLine)
 			}
 			if (ErrorJumpTextBlock.IsValid())
 			{
-				ErrorJumpTextBlock->SetText(FText::FromString(FString::Printf(TEXT("❌ %s:%d (F4)"), *FPaths::GetCleanFilename(LastParsedErrorFile), LastParsedErrorLine)));
+				ErrorJumpTextBlock->SetText(FText::FromString(FString::Printf(TEXT("%s:%d (F4)"), *FPaths::GetCleanFilename(LastParsedErrorFile), LastParsedErrorLine)));
 			}
 		}
 	}

@@ -17,6 +17,8 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/AppStyle.h"
+#include "SlateLivePreviewStyle.h"
+#include "Widgets/Images/SImage.h"
 #include "DesktopPlatformModule.h"
 #include "HAL/PlatformProcess.h"
 
@@ -145,8 +147,21 @@ void SSlateLivePreviewTab::Construct(const FArguments& InArgs)
 				.Padding(2.0f)
 				[
 					SNew(SButton)
-					.Text(FText::FromString(TEXT("🔄 Refresh")))
+					.ContentPadding(FMargin(6.0f, 2.0f))
 					.OnClicked(this, &SSlateLivePreviewTab::OnRefreshClicked)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 4.0f, 0.0f)
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Refresh")))
+							.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("Refresh")))
+						]
+					]
 				]
 
 				// Take Snapshot button
@@ -156,8 +171,21 @@ void SSlateLivePreviewTab::Construct(const FArguments& InArgs)
 				.Padding(2.0f)
 				[
 					SNew(SButton)
-					.Text(FText::FromString(TEXT("📸 Snapshot")))
+					.ContentPadding(FMargin(6.0f, 2.0f))
 					.OnClicked(this, &SSlateLivePreviewTab::OnSnapshotClicked)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 4.0f, 0.0f)
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Snapshot")))
+							.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("Snapshot")))
+						]
+					]
 				]
 
 				// Template Presets
@@ -475,7 +503,7 @@ void SSlateLivePreviewTab::RebuildPreview()
 
 		Viewport->SetPreviewWidget(LiveWidget);
 
-		StatusTextBlock->SetText(FText::FromString(FString::Printf(TEXT("✓ Parsed in %.2f ms | Root: <%s> | Properties: %d | Slots: %d"),
+		StatusTextBlock->SetText(FText::FromString(FString::Printf(TEXT("Parsed in %.2f ms | Root: <%s> | Properties: %d | Slots: %d"),
 			ElapsedMs, *RootAst->WidgetType, RootAst->Properties.Num(), RootAst->Slots.Num())));
 
 		if (bAutoSnapshot)
@@ -488,7 +516,7 @@ void SSlateLivePreviewTab::RebuildPreview()
 		TSharedRef<SWidget> ErrorWidget = FSlateWidgetBuilder::BuildErrorWidget(Errors, Warnings);
 		Viewport->SetPreviewWidget(ErrorWidget);
 
-		StatusTextBlock->SetText(FText::FromString(FString::Printf(TEXT("❌ Parsing error (%d error(s), %d warning(s))"),
+		StatusTextBlock->SetText(FText::FromString(FString::Printf(TEXT("Parsing error (%d error(s), %d warning(s))"),
 			Errors.Num(), Warnings.Num())));
 	}
 }

@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Antigravity & User. All Rights Reserved.
 
 #include "SCppProjectTree.h"
+#include "SlateLivePreviewStyle.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -52,8 +54,7 @@ void SCppProjectTree::Construct(const FArguments& InArgs)
 			.Padding(2.0f, 0.0f)
 			[
 				SNew(SButton)
-				.ButtonColorAndOpacity(FLinearColor(0.12f, 0.52f, 0.95f, 1.0f))
-				.Text(FText::FromString(TEXT("+ New")))
+				.ButtonColorAndOpacity(FLinearColor(0.18f, 0.45f, 0.3f, 1.0f))
 				.ToolTipText(FText::FromString(TEXT("Create new C++ Class / Slate Widget (Ctrl+N)")))
 				.OnClicked_Lambda([this]() -> FReply
 				{
@@ -63,6 +64,25 @@ void SCppProjectTree::Construct(const FArguments& InArgs)
 					}
 					return FReply::Handled();
 				})
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(0.0f, 0.0f, 3.0f, 0.0f)
+					[
+						SNew(SImage)
+						.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.NewClass")))
+						.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+					]
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("New")))
+					]
+				]
 			]
 			+ SHorizontalBox::Slot()
 			.AutoWidth()
@@ -70,13 +90,19 @@ void SCppProjectTree::Construct(const FArguments& InArgs)
 			.Padding(2.0f, 0.0f)
 			[
 				SNew(SButton)
-				.Text(FText::FromString(TEXT("🔄")))
+				.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+				.ContentPadding(FMargin(2.0f))
 				.ToolTipText(FText::FromString(TEXT("Refresh Source Tree")))
 				.OnClicked_Lambda([this]() -> FReply
 				{
 					RefreshTree();
 					return FReply::Handled();
 				})
+				[
+					SNew(SImage)
+					.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Revert")))
+					.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+				]
 			]
 		]
 
@@ -233,30 +259,30 @@ void SCppProjectTree::OnFilterTextChanged(const FText& InFilterText)
 
 TSharedRef<ITableRow> SCppProjectTree::OnGenerateRow(TSharedPtr<FCppSourceNode> InItem, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	FString PrefixIcon = InItem->bIsDirectory ? TEXT("📁 ") : TEXT("📄 ");
+	FName IconBrushName = InItem->bIsDirectory ? TEXT("SlateLivePreview.Tree.FolderClosed") : TEXT("SlateLivePreview.NewClass");
 	FLinearColor ItemColor = FLinearColor::White;
 
 	if (InItem->bIsDirectory)
 	{
-		ItemColor = FLinearColor(0.9f, 0.8f, 0.4f, 1.0f);
+		ItemColor = FLinearColor(0.95f, 0.85f, 0.45f, 1.0f);
 	}
 	else
 	{
 		FString Ext = FPaths::GetExtension(InItem->Name).ToLower();
 		if (Ext == TEXT("h") || Ext == TEXT("inl"))
 		{
-			PrefixIcon = TEXT("🔷 ");
-			ItemColor = FLinearColor(0.4f, 0.8f, 1.0f, 1.0f);
+			IconBrushName = TEXT("SlateLivePreview.Tree.HeaderFile");
+			ItemColor = FLinearColor(0.45f, 0.82f, 1.0f, 1.0f);
 		}
 		else if (Ext == TEXT("cpp"))
 		{
-			PrefixIcon = TEXT("⚡ ");
-			ItemColor = FLinearColor(0.5f, 1.0f, 0.5f, 1.0f);
+			IconBrushName = TEXT("SlateLivePreview.Tree.SourceFile");
+			ItemColor = FLinearColor(0.45f, 0.95f, 0.65f, 1.0f);
 		}
 		else if (Ext == TEXT("cs"))
 		{
-			PrefixIcon = TEXT("⚙ ");
-			ItemColor = FLinearColor(0.8f, 0.6f, 1.0f, 1.0f);
+			IconBrushName = TEXT("SlateLivePreview.Tree.BuildFile");
+			ItemColor = FLinearColor(0.85f, 0.65f, 1.0f, 1.0f);
 		}
 	}
 
@@ -267,10 +293,11 @@ TSharedRef<ITableRow> SCppProjectTree::OnGenerateRow(TSharedPtr<FCppSourceNode> 
 		+ SHorizontalBox::Slot()
 		.AutoWidth()
 		.VAlign(VAlign_Center)
-		.Padding(FMargin(4.0f, 1.0f))
+		.Padding(FMargin(2.0f, 1.0f, 5.0f, 1.0f))
 		[
-			SNew(STextBlock)
-			.Text(FText::FromString(PrefixIcon))
+			SNew(SImage)
+			.Image(FSlateLivePreviewStyle::GetBrush(IconBrushName))
+			.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
 		]
 		+ SHorizontalBox::Slot()
 		.FillWidth(1.0f)
@@ -380,30 +407,30 @@ TSharedPtr<SWidget> SCppProjectTree::OnContextMenuOpening()
 
 	if (!SelectedNode->bIsDirectory)
 	{
-		// ✏️ Rename File / Class...
+		// Rename File / Class...
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("✏️ Rename File / Class Refactor...")),
+			FText::FromString(TEXT("Rename File / Class Refactor...")),
 			FText::FromString(TEXT("Rename file, companion header/source, and update symbols")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Rename")),
 			FUIAction(FExecuteAction::CreateSP(this, &SCppProjectTree::OpenRenameDialog, SelectedNode))
 		);
 
-		// 🗑️ Delete File...
+		// Delete File...
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("🗑️ Delete File...")),
+			FText::FromString(TEXT("Delete File...")),
 			FText::FromString(TEXT("Delete file permanently from disk")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Delete")),
 			FUIAction(FExecuteAction::CreateSP(this, &SCppProjectTree::DeleteNode, SelectedNode))
 		);
 
 		MenuBuilder.AddSeparator();
 
-		// ➕ New C++ Class Here
+		// New C++ Class Here
 		FString FolderPath = FPaths::GetPath(SelectedNode->FullPath);
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("➕ New C++ Class in This Folder...")),
+			FText::FromString(TEXT("New C++ Class in This Folder...")),
 			FText::FromString(TEXT("Create a new class in the directory containing this file")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.NewClass")),
 			FUIAction(FExecuteAction::CreateLambda([FolderPath, this]()
 			{
 				SCreateClassDialog::OpenModal(FolderPath, FOnClassCreated::CreateLambda([this](const FString&, const FString&)
@@ -415,23 +442,23 @@ TSharedPtr<SWidget> SCppProjectTree::OnContextMenuOpening()
 
 		MenuBuilder.AddSeparator();
 
-		// 📂 Show in Explorer
+		// Show in Explorer
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("📂 Show in Explorer")),
+			FText::FromString(TEXT("Show in Explorer")),
 			FText::FromString(TEXT("Open containing folder in Windows Explorer")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.ShowInExplorer")),
 			FUIAction(FExecuteAction::CreateLambda([FolderPath]()
 			{
 				FPlatformProcess::ExploreFolder(*FolderPath);
 			}))
 		);
 
-		// 📋 Copy Full Path
+		// Copy Full Path
 		FString FullPath = SelectedNode->FullPath;
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("📋 Copy Full Path")),
+			FText::FromString(TEXT("Copy Full Path")),
 			FText::FromString(TEXT("Copy absolute file path to clipboard")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.CopyPath")),
 			FUIAction(FExecuteAction::CreateLambda([FullPath]()
 			{
 				FPlatformApplicationMisc::ClipboardCopy(*FullPath);
@@ -443,11 +470,11 @@ TSharedPtr<SWidget> SCppProjectTree::OnContextMenuOpening()
 		// Directory
 		FString FolderPath = SelectedNode->FullPath;
 
-		// ➕ New C++ Class / File Here...
+		// New C++ Class / File Here...
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("➕ New C++ Class in This Folder...")),
+			FText::FromString(TEXT("New C++ Class in This Folder...")),
 			FText::FromString(TEXT("Create a new class in this directory")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.NewClass")),
 			FUIAction(FExecuteAction::CreateLambda([FolderPath, this]()
 			{
 				SCreateClassDialog::OpenModal(FolderPath, FOnClassCreated::CreateLambda([this](const FString&, const FString&)
@@ -457,40 +484,40 @@ TSharedPtr<SWidget> SCppProjectTree::OnContextMenuOpening()
 			}))
 		);
 
-		// ✏️ Rename Folder...
+		// Rename Folder...
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("✏️ Rename Folder...")),
+			FText::FromString(TEXT("Rename Folder...")),
 			FText::FromString(TEXT("Rename this directory")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Rename")),
 			FUIAction(FExecuteAction::CreateSP(this, &SCppProjectTree::OpenRenameDialog, SelectedNode))
 		);
 
-		// 🗑️ Delete Folder...
+		// Delete Folder...
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("🗑️ Delete Folder...")),
+			FText::FromString(TEXT("Delete Folder...")),
 			FText::FromString(TEXT("Delete directory and its contents")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Delete")),
 			FUIAction(FExecuteAction::CreateSP(this, &SCppProjectTree::DeleteNode, SelectedNode))
 		);
 
 		MenuBuilder.AddSeparator();
 
-		// 📂 Show in Explorer
+		// Show in Explorer
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("📂 Show in Explorer")),
+			FText::FromString(TEXT("Show in Explorer")),
 			FText::FromString(TEXT("Open directory in Windows Explorer")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.ShowInExplorer")),
 			FUIAction(FExecuteAction::CreateLambda([FolderPath]()
 			{
 				FPlatformProcess::ExploreFolder(*FolderPath);
 			}))
 		);
 
-		// 📋 Copy Full Path
+		// Copy Full Path
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("📋 Copy Full Path")),
+			FText::FromString(TEXT("Copy Full Path")),
 			FText::FromString(TEXT("Copy directory path to clipboard")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.CopyPath")),
 			FUIAction(FExecuteAction::CreateLambda([FolderPath]()
 			{
 				FPlatformApplicationMisc::ClipboardCopy(*FolderPath);
@@ -583,10 +610,25 @@ void SCppProjectTree::OpenRenameDialog(TSharedPtr<FCppSourceNode> Node)
 			.AutoHeight()
 			.Padding(0.0f, 0.0f, 0.0f, 10.0f)
 			[
-				SNew(STextBlock)
-				.Text(FText::FromString(FString::Printf(TEXT("✏️ Rename: %s"), *Node->Name)))
-				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
-				.ColorAndOpacity(FLinearColor(0.35f, 0.75f, 1.0f, 1.0f))
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+				[
+					SNew(SImage)
+					.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Rename")))
+					.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+				]
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(FString::Printf(TEXT("Rename: %s"), *Node->Name)))
+					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+					.ColorAndOpacity(FLinearColor(0.35f, 0.75f, 1.0f, 1.0f))
+				]
 			]
 
 			// New Name Input
@@ -665,7 +707,25 @@ void SCppProjectTree::OpenRenameDialog(TSharedPtr<FCppSourceNode> Node)
 				[
 					SNew(SButton)
 					.ButtonColorAndOpacity(FLinearColor(0.12f, 0.52f, 0.95f, 1.0f))
-					.Text(FText::FromString(TEXT("✏️ Rename & Refactor")))
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Rename")))
+							.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+						]
+						+ SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("Rename & Refactor")))
+						]
+					]
 					.OnClicked_Lambda([this, RenameWindow, Node, OldFullPath, OldBaseFilename, OldExtension, FolderPath, CompanionOldPath, bIsSourceFile, NewNameTextBox, RenameCompanionCheckBox, RefactorSymbolsCheckBox]() -> FReply
 					{
 						FString NewNameRaw = NewNameTextBox->GetText().ToString().TrimStartAndEnd();

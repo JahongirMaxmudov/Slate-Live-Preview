@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Antigravity & User. All Rights Reserved.
 
 #include "SCppEditorPane.h"
+#include "SlateLivePreviewStyle.h"
 #include "CppSyntaxHighlighter.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SSearchBox.h"
@@ -241,52 +243,67 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 				[
 					SNew(SHorizontalBox)
 
-					// ↶ Undo
+					// Undo
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.Padding(1.0f, 0.0f)
 					[
 						SNew(SButton)
 						.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-						.Text(FText::FromString(TEXT("↶")))
+						.ContentPadding(FMargin(2.0f))
 						.ToolTipText(FText::FromString(TEXT("Undo (Ctrl+Z)")))
 						.OnClicked_Lambda([this]() -> FReply
 						{
 							Undo();
 							return FReply::Handled();
 						})
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Undo")))
+							.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+						]
 					]
 
-					// ↷ Redo
+					// Redo
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.Padding(1.0f, 0.0f)
 					[
 						SNew(SButton)
 						.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-						.Text(FText::FromString(TEXT("↷")))
+						.ContentPadding(FMargin(2.0f))
 						.ToolTipText(FText::FromString(TEXT("Redo (Ctrl+Y)")))
 						.OnClicked_Lambda([this]() -> FReply
 						{
 							Redo();
 							return FReply::Handled();
 						})
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Redo")))
+							.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+						]
 					]
 
-					// 🔍 Find
+					// Find
 					+ SHorizontalBox::Slot()
 					.AutoWidth()
 					.Padding(1.0f, 0.0f)
 					[
 						SNew(SButton)
 						.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-						.Text(FText::FromString(TEXT("🔍")))
+						.ContentPadding(FMargin(2.0f))
 						.ToolTipText(FText::FromString(TEXT("Find in file (Ctrl+F)")))
 						.OnClicked_Lambda([this]() -> FReply
 						{
 							ToggleFindBar(!bFindBarVisible);
 							return FReply::Handled();
 						})
+						[
+							SNew(SImage)
+							.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Find")))
+							.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+						]
 					]
 				]
 			]
@@ -310,9 +327,24 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 				.VAlign(VAlign_Center)
 				.Padding(4.0f, 0.0f)
 				[
-					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("🔍 Find:")))
-					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+					[
+						SNew(SImage)
+						.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Find")))
+						.DesiredSizeOverride(FVector2D(12.0f, 12.0f))
+					]
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("Find:")))
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
+					]
 				]
 
 				+ SHorizontalBox::Slot()
@@ -343,13 +375,19 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 				.Padding(2.0f, 0.0f)
 				[
 					SNew(SButton)
-					.Text(FText::FromString(TEXT("▲")))
+					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+					.ContentPadding(FMargin(4.0f, 2.0f))
 					.ToolTipText(FText::FromString(TEXT("Previous Match (Shift+Enter)")))
 					.OnClicked_Lambda([this]() -> FReply
 					{
 						FindPrevious();
 						return FReply::Handled();
 					})
+					[
+						SNew(SImage)
+						.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.ArrowUp")))
+						.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+					]
 				]
 
 				// Next Match
@@ -359,13 +397,19 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 				.Padding(2.0f, 0.0f)
 				[
 					SNew(SButton)
-					.Text(FText::FromString(TEXT("▼")))
+					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+					.ContentPadding(FMargin(4.0f, 2.0f))
 					.ToolTipText(FText::FromString(TEXT("Next Match (Enter)")))
 					.OnClicked_Lambda([this]() -> FReply
 					{
 						FindNext();
 						return FReply::Handled();
 					})
+					[
+						SNew(SImage)
+						.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.ArrowDown")))
+						.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+					]
 				]
 
 				// Match Count Indicator
@@ -414,13 +458,18 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-					.Text(FText::FromString(TEXT("✕")))
+					.ContentPadding(FMargin(2.0f))
 					.ToolTipText(FText::FromString(TEXT("Close Find Bar (Esc)")))
 					.OnClicked_Lambda([this]() -> FReply
 					{
 						ToggleFindBar(false);
 						return FReply::Handled();
 					})
+					[
+						SNew(SImage)
+						.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.CloseTab")))
+						.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+					]
 				]
 			]
 		]
@@ -567,9 +616,18 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 											+ SHorizontalBox::Slot()
 											.AutoWidth()
 											.VAlign(VAlign_Center)
+											.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+											[
+												SNew(SImage)
+												.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.ShowInExplorer")))
+												.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+											]
+											+ SHorizontalBox::Slot()
+											.AutoWidth()
+											.VAlign(VAlign_Center)
 											[
 												SNew(STextBlock)
-												.Text(FText::FromString(TEXT("🔗 Epic Games Documentation ↗")))
+												.Text(FText::FromString(TEXT("Epic Games Documentation")))
 												.Font(FCoreStyle::GetDefaultFontStyle("Bold", 8))
 												.ColorAndOpacity(FLinearColor(0.33f, 0.65f, 1.0f, 1.0f))
 											]
@@ -852,12 +910,11 @@ void SCppEditorPane::RebuildTabStrip()
 		const bool bIsActive = (i == ActiveDocumentIndex);
 
 		FString Ext = FPaths::GetExtension(Doc->Filename).ToLower();
-		FString Icon = TEXT("📄 ");
-		if (Ext == TEXT("h") || Ext == TEXT("inl")) Icon = TEXT("🔷 ");
-		else if (Ext == TEXT("cpp")) Icon = TEXT("⚡ ");
-		else if (Ext == TEXT("cs")) Icon = TEXT("⚙ ");
+		FName TabIconName = TEXT("SlateLivePreview.Tree.SourceFile");
+		if (Ext == TEXT("h") || Ext == TEXT("inl")) TabIconName = TEXT("SlateLivePreview.Tree.HeaderFile");
+		else if (Ext == TEXT("cs")) TabIconName = TEXT("SlateLivePreview.Tree.BuildFile");
 
-		FString DisplayTitle = FString::Printf(TEXT("%s%s%s"), *Icon, *Doc->Filename, Doc->bIsDirty ? TEXT(" *") : TEXT(""));
+		FString DisplayTitle = FString::Printf(TEXT("%s%s"), *Doc->Filename, Doc->bIsDirty ? TEXT(" *") : TEXT(""));
 
 		FLinearColor TabBg = bIsActive ? FLinearColor(0.18f, 0.18f, 0.18f, 1.0f) : FLinearColor(0.10f, 0.10f, 0.10f, 0.9f);
 		FLinearColor TabBorder = bIsActive ? FLinearColor(0.0f, 0.48f, 0.8f, 1.0f) : FLinearColor(0.15f, 0.15f, 0.15f, 0.5f);
@@ -900,14 +957,31 @@ void SCppEditorPane::RebuildTabStrip()
 								return FReply::Handled();
 							})
 							[
-								SNew(STextBlock)
-								.Text(FText::FromString(DisplayTitle))
-								.Font(FCoreStyle::GetDefaultFontStyle(bIsActive ? "Bold" : "Regular", 9))
-								.ColorAndOpacity(bIsActive ? FLinearColor::White : FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+								SNew(SHorizontalBox)
+
+								+ SHorizontalBox::Slot()
+								.AutoWidth()
+								.VAlign(VAlign_Center)
+								.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+								[
+									SNew(SImage)
+									.Image(FSlateLivePreviewStyle::GetBrush(TabIconName))
+									.DesiredSizeOverride(FVector2D(13.0f, 13.0f))
+								]
+
+								+ SHorizontalBox::Slot()
+								.AutoWidth()
+								.VAlign(VAlign_Center)
+								[
+									SNew(STextBlock)
+									.Text(FText::FromString(DisplayTitle))
+									.Font(FCoreStyle::GetDefaultFontStyle(bIsActive ? "Bold" : "Regular", 9))
+									.ColorAndOpacity(bIsActive ? FLinearColor::White : FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+								]
 							]
 						]
 
-						// Tab Close Button ✕
+						// Tab Close Button
 						+ SHorizontalBox::Slot()
 						.AutoWidth()
 						.VAlign(VAlign_Center)
@@ -915,15 +989,20 @@ void SCppEditorPane::RebuildTabStrip()
 						[
 							SNew(SButton)
 							.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-							.Text(FText::FromString(TEXT("✕")))
 							.ToolTipText(FText::FromString(TEXT("Close Tab")))
-							.ContentPadding(FMargin(2.0f, 0.0f))
+							.ContentPadding(FMargin(2.0f, 1.0f))
 							.OnClicked_Lambda([this, FilePath = Doc->FilePath]() -> FReply
 							{
 								CloseFile(FilePath);
 								FocusEditor();
 								return FReply::Handled();
 							})
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.CloseTab")))
+								.DesiredSizeOverride(FVector2D(10.0f, 10.0f))
+								.ColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.75f, 0.75f, 0.7f)))
+							]
 						]
 					]
 				]
@@ -1338,17 +1417,17 @@ TSharedPtr<SWidget> SCppEditorPane::OnEditorContextMenuOpening()
 	if (bIsHeader)
 	{
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("💡 Quick Fix: Generate Definition in .cpp")),
+			FText::FromString(TEXT("Quick Fix: Generate Definition in .cpp")),
 			FText::FromString(TEXT("Generate C++ member function definition in matching .cpp file")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.QuickFix")),
 			FUIAction(FExecuteAction::CreateSP(this, &SCppEditorPane::QuickActionGenerateDefinition))
 		);
 	}
 
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("🔄 Switch Header / Source (Alt+O)")),
+		FText::FromString(TEXT("Switch Header / Source (Alt+O)")),
 		FText::FromString(TEXT("Toggle between .h header and .cpp source file")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.SwitchHeader")),
 		FUIAction(FExecuteAction::CreateSP(this, &SCppEditorPane::ToggleHeaderSource))
 	);
 
@@ -1356,9 +1435,9 @@ TSharedPtr<SWidget> SCppEditorPane::OnEditorContextMenuOpening()
 
 	// Cut
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("✂️ Cut (Ctrl+X)")),
+		FText::FromString(TEXT("Cut (Ctrl+X)")),
 		FText::FromString(TEXT("Cut selection to clipboard")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Cut")),
 		FUIAction(FExecuteAction::CreateLambda([this]()
 		{
 			if (CodeTextBox.IsValid())
@@ -1375,9 +1454,9 @@ TSharedPtr<SWidget> SCppEditorPane::OnEditorContextMenuOpening()
 
 	// Copy
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("📋 Copy (Ctrl+C)")),
+		FText::FromString(TEXT("Copy (Ctrl+C)")),
 		FText::FromString(TEXT("Copy selection to clipboard")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.CopyPath")),
 		FUIAction(FExecuteAction::CreateLambda([this]()
 		{
 			if (CodeTextBox.IsValid())
@@ -1393,9 +1472,9 @@ TSharedPtr<SWidget> SCppEditorPane::OnEditorContextMenuOpening()
 
 	// Paste
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("📥 Paste (Ctrl+V)")),
+		FText::FromString(TEXT("Paste (Ctrl+V)")),
 		FText::FromString(TEXT("Paste text from clipboard")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Paste")),
 		FUIAction(FExecuteAction::CreateLambda([this]()
 		{
 			FString PastedText;
@@ -1411,25 +1490,25 @@ TSharedPtr<SWidget> SCppEditorPane::OnEditorContextMenuOpening()
 
 	// Toggle Line Comment
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("💬 Toggle Line Comment (Ctrl+/)")),
+		FText::FromString(TEXT("Toggle Line Comment (Ctrl+/)")),
 		FText::FromString(TEXT("Comment or uncomment current line")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Comment")),
 		FUIAction(FExecuteAction::CreateSP(this, &SCppEditorPane::ToggleLineComment))
 	);
 
 	// Duplicate Line
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("📄 Duplicate Line (Ctrl+D)")),
+		FText::FromString(TEXT("Duplicate Line (Ctrl+D)")),
 		FText::FromString(TEXT("Duplicate current line downwards")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Duplicate")),
 		FUIAction(FExecuteAction::CreateSP(this, &SCppEditorPane::DuplicateLine))
 	);
 
 	// Delete Line
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("🗑️ Delete Line (Ctrl+Shift+K)")),
+		FText::FromString(TEXT("Delete Line (Ctrl+Shift+K)")),
 		FText::FromString(TEXT("Delete current line")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Delete")),
 		FUIAction(FExecuteAction::CreateSP(this, &SCppEditorPane::DeleteLine))
 	);
 
@@ -1437,17 +1516,17 @@ TSharedPtr<SWidget> SCppEditorPane::OnEditorContextMenuOpening()
 
 	// Find
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("🔍 Find in File (Ctrl+F)")),
+		FText::FromString(TEXT("Find in File (Ctrl+F)")),
 		FText::FromString(TEXT("Open find bar")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Find")),
 		FUIAction(FExecuteAction::CreateLambda([this]() { ToggleFindBar(true); }))
 	);
 
 	// Save
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("💾 Save File (Ctrl+S)")),
+		FText::FromString(TEXT("Save File (Ctrl+S)")),
 		FText::FromString(TEXT("Save current file")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Save")),
 		FUIAction(FExecuteAction::CreateLambda([this]() { SaveCurrentFile(); }))
 	);
 
@@ -1464,9 +1543,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 
 	// Close Tab
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("✕ Close Tab")),
+		FText::FromString(TEXT("Close Tab")),
 		FText::FromString(TEXT("Close this tab")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.CloseTab")),
 		FUIAction(FExecuteAction::CreateLambda([this, FilePath = Doc->FilePath]()
 		{
 			CloseFile(FilePath);
@@ -1475,9 +1554,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 
 	// Close Others
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("✖️ Close Other Tabs")),
+		FText::FromString(TEXT("Close Other Tabs")),
 		FText::FromString(TEXT("Close all other tabs except this one")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.CloseTab")),
 		FUIAction(FExecuteAction::CreateLambda([this, FilePath = Doc->FilePath]()
 		{
 			CloseOtherFiles(FilePath);
@@ -1486,9 +1565,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 
 	// Close All
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("🗑️ Close All Tabs")),
+		FText::FromString(TEXT("Close All Tabs")),
 		FText::FromString(TEXT("Close all tabs in this pane")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.Delete")),
 		FUIAction(FExecuteAction::CreateSP(this, &SCppEditorPane::CloseAllFiles))
 	);
 
@@ -1498,9 +1577,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 	if (DocIndex > 0)
 	{
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("◀ Move Tab Left")),
+			FText::FromString(TEXT("Move Tab Left")),
 			FText::FromString(TEXT("Shift tab to the left")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.ArrowLeft")),
 			FUIAction(FExecuteAction::CreateLambda([this, DocIndex]()
 			{
 				MoveDocumentTab(DocIndex, DocIndex - 1);
@@ -1512,9 +1591,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 	if (DocIndex < OpenDocuments.Num() - 1)
 	{
 		MenuBuilder.AddMenuEntry(
-			FText::FromString(TEXT("▶ Move Tab Right")),
+			FText::FromString(TEXT("Move Tab Right")),
 			FText::FromString(TEXT("Shift tab to the right")),
-			FSlateIcon(),
+			FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.ArrowRight")),
 			FUIAction(FExecuteAction::CreateLambda([this, DocIndex]()
 			{
 				MoveDocumentTab(DocIndex, DocIndex + 1);
@@ -1524,9 +1603,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 
 	// Move to Other Pane
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("➡️ Move to Other Split Pane")),
+		FText::FromString(TEXT("Move to Other Split Pane")),
 		FText::FromString(TEXT("Move this tab into the opposite editor split pane")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.SplitView")),
 		FUIAction(FExecuteAction::CreateLambda([this, FilePath = Doc->FilePath]()
 		{
 			if (OnMoveDocumentRequested.IsBound())
@@ -1541,9 +1620,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 	// Copy Path
 	FString FilePath = Doc->FilePath;
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("📋 Copy File Path")),
+		FText::FromString(TEXT("Copy File Path")),
 		FText::FromString(TEXT("Copy absolute file path to clipboard")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.CopyPath")),
 		FUIAction(FExecuteAction::CreateLambda([FilePath]()
 		{
 			FPlatformApplicationMisc::ClipboardCopy(*FilePath);
@@ -1552,9 +1631,9 @@ void SCppEditorPane::ShowTabContextMenu(const FPointerEvent& MouseEvent, TShared
 
 	// Reveal in Explorer
 	MenuBuilder.AddMenuEntry(
-		FText::FromString(TEXT("📂 Reveal in Explorer")),
+		FText::FromString(TEXT("Reveal in Explorer")),
 		FText::FromString(TEXT("Open containing folder in Windows Explorer")),
-		FSlateIcon(),
+		FSlateIcon(FSlateLivePreviewStyle::GetStyleSetName(), TEXT("SlateLivePreview.ShowInExplorer")),
 		FUIAction(FExecuteAction::CreateLambda([FilePath]()
 		{
 			FPlatformProcess::ExploreFolder(*FPaths::GetPath(FilePath));
