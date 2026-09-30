@@ -1058,21 +1058,32 @@ FReply SCppSettingsDialog::OnSignInWithGitHubClicked()
 		GitHubAuthStatusText->SetText(FText::FromString(TEXT("Connecting to GitHub...")));
 	}
 
+	TWeakPtr<SCppSettingsDialog> WeakThis = SharedThis(this);
 	FCppAiAssistant::Get().StartGitHubDeviceFlow(
-		FOnGitHubDeviceCodeReceived::CreateLambda([this](const FString& UserCode, const FString& Uri)
+		FOnGitHubDeviceCodeReceived::CreateLambda([WeakThis](const FString& UserCode, const FString& Uri)
 		{
-			ActiveGitHubUserCode = UserCode;
-			ActiveGitHubVerificationUri = Uri;
-		}),
-		FOnGitHubAuthComplete::CreateLambda([this](bool bSuccess, const FString& MessageOrUser)
-		{
-			ActiveGitHubUserCode.Empty();
-			if (bSuccess)
+			if (TSharedPtr<SCppSettingsDialog> Pinned = WeakThis.Pin())
 			{
-				const FCppEditorSettings& Settings = FCppEditorSettings::Get();
-				TempAiApiKey = Settings.GitHubAccessToken;
-				TempAiEndpoint = Settings.AiEndpoint;
-				TempAiModel = Settings.AiModel;
+				Pinned->ActiveGitHubUserCode = UserCode;
+				Pinned->ActiveGitHubVerificationUri = Uri;
+			}
+		}),
+		FOnGitHubAuthComplete::CreateLambda([WeakThis](bool bSuccess, const FString& MessageOrUser)
+		{
+			if (TSharedPtr<SCppSettingsDialog> Pinned = WeakThis.Pin())
+			{
+				Pinned->ActiveGitHubUserCode.Empty();
+				if (bSuccess)
+				{
+					const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+					Pinned->TempAiApiKey = Settings.GitHubAccessToken;
+					Pinned->TempAiEndpoint = Settings.AiEndpoint;
+					Pinned->TempAiModel = Settings.AiModel;
+				}
+				else if (Pinned->GitHubAuthStatusText.IsValid())
+				{
+					Pinned->GitHubAuthStatusText->SetText(FText::FromString(MessageOrUser));
+				}
 			}
 		})
 	);
@@ -1110,16 +1121,20 @@ FReply SCppSettingsDialog::OnTestAiConnectionClicked()
 		AiTestStatusTextBlock->SetColorAndOpacity(FLinearColor(0.8f, 0.8f, 0.8f, 1.0f));
 	}
 
+	TWeakPtr<SCppSettingsDialog> WeakThis = SharedThis(this);
 	FCppAiAssistant::Get().TestConnection(
 		TempAiEndpoint,
 		TempAiModel,
 		TempAiApiKey,
-		FOnAiTestResult::CreateLambda([this](bool bSuccess, const FString& Message)
+		FOnAiTestResult::CreateLambda([WeakThis](bool bSuccess, const FString& Message)
 		{
-			if (AiTestStatusTextBlock.IsValid())
+			if (TSharedPtr<SCppSettingsDialog> Pinned = WeakThis.Pin())
 			{
-				AiTestStatusTextBlock->SetText(FText::FromString(Message));
-				AiTestStatusTextBlock->SetColorAndOpacity(bSuccess ? FLinearColor(0.2f, 0.9f, 0.4f, 1.0f) : FLinearColor(1.0f, 0.35f, 0.35f, 1.0f));
+				if (Pinned->AiTestStatusTextBlock.IsValid())
+				{
+					Pinned->AiTestStatusTextBlock->SetText(FText::FromString(Message));
+					Pinned->AiTestStatusTextBlock->SetColorAndOpacity(bSuccess ? FLinearColor(0.2f, 0.9f, 0.4f, 1.0f) : FLinearColor(1.0f, 0.35f, 0.35f, 1.0f));
+				}
 			}
 		})
 	);

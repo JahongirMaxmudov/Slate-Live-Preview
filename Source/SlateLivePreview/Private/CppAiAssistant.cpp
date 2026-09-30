@@ -11,6 +11,7 @@
 #include "Misc/DateTime.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "HAL/PlatformProcess.h"
+#include "GenericPlatform/GenericPlatformHttp.h"
 #include "Containers/Ticker.h"
 
 FCppAiAssistant& FCppAiAssistant::Get()
@@ -371,7 +372,7 @@ void FCppAiAssistant::TestConnection(
 	Request->SetURL(Endpoint);
 	Request->SetVerb(TEXT("POST"));
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	Request->SetTimeout(10.0f);
+	Request->SetTimeout(5.0f);
 
 	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
 	if (InEndpoint.Contains(TEXT("githubcopilot.com")) || Settings.AiProvider == EAiProvider::GitHubCopilot)
@@ -389,6 +390,11 @@ void FCppAiAssistant::TestConnection(
 		if (!AuthToken.IsEmpty())
 		{
 			Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
+		}
+		else
+		{
+			InCallback.ExecuteIfBound(false, TEXT("Please sign in with GitHub first to test Copilot connection."));
+			return;
 		}
 	}
 	else if (!InApiKey.IsEmpty())
@@ -475,17 +481,12 @@ void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeRe
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(TEXT("https://github.com/login/device/code"));
 	Request->SetVerb(TEXT("POST"));
-	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/x-www-form-urlencoded"));
 	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+	Request->SetTimeout(10.0f);
 
-	TSharedPtr<FJsonObject> JsonObj = MakeShared<FJsonObject>();
-	// Standard VS Code GitHub Copilot OAuth client ID
-	JsonObj->SetStringField(TEXT("client_id"), TEXT("019f0fd8758e3d164f1b"));
-	JsonObj->SetStringField(TEXT("scope"), TEXT("read:user"));
-
-	FString Payload;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Payload);
-	FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
+	// Official GitHub Copilot Device Flow Client ID
+	FString Payload = TEXT("client_id=Iv1.b507a08c87ecfe98&scope=read:user");
 	Request->SetContentAsString(Payload);
 
 	Request->OnProcessRequestComplete().BindLambda(
@@ -562,17 +563,14 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(TEXT("https://github.com/login/oauth/access_token"));
 	Request->SetVerb(TEXT("POST"));
-	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+	Request->SetHeader(TEXT("Content-Type"), TEXT("application/x-www-form-urlencoded"));
 	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+	Request->SetTimeout(10.0f);
 
-	TSharedPtr<FJsonObject> JsonObj = MakeShared<FJsonObject>();
-	JsonObj->SetStringField(TEXT("client_id"), TEXT("019f0fd8758e3d164f1b"));
-	JsonObj->SetStringField(TEXT("device_code"), ActiveDeviceCode);
-	JsonObj->SetStringField(TEXT("grant_type"), TEXT("urn:ietf:params:oauth:grant-type:device_code"));
-
-	FString Payload;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Payload);
-	FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
+	FString Payload = FString::Printf(
+		TEXT("client_id=Iv1.b507a08c87ecfe98&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code"),
+		*FGenericPlatformHttp::UrlEncode(ActiveDeviceCode)
+	);
 	Request->SetContentAsString(Payload);
 
 	Request->OnProcessRequestComplete().BindLambda(

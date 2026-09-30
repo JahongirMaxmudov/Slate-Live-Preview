@@ -2975,6 +2975,179 @@ void SCppEditorPane::EnsureIntelliSenseDatabaseLoaded()
 		TEXT("Snippet: SOverlay layered layout"),
 		TEXT("Generates an overlay panel for stacking widgets."),
 		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/slate-overview-in-unreal-engine"));
+
+	// -------------------------------------------------------------------------
+	// 14. Core Unreal Engine Gameplay Classes & Framework
+	// -------------------------------------------------------------------------
+	AddItem(TEXT("AActor"), TEXT("AActor"), EIntelliSenseCategory::Type,
+		TEXT("class AActor : public UObject"),
+		TEXT("Base class for an Object that can be placed or spawned in a level. Actors support components, replication, transforms, and receive BeginPlay and Tick events."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("APawn"), TEXT("APawn"), EIntelliSenseCategory::Type,
+		TEXT("class APawn : public AActor"),
+		TEXT("An Actor that can be possessed by Players or AI controllers. Serves as physical or virtual agent in the game world."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/pawns-in-unreal-engine"));
+
+	AddItem(TEXT("ACharacter"), TEXT("ACharacter"), EIntelliSenseCategory::Type,
+		TEXT("class ACharacter : public APawn"),
+		TEXT("Specialized humanoid Pawn featuring CharacterMovementComponent, CapsuleComponent collision, and network-synchronized locomotion."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/characters-in-unreal-engine"));
+
+	AddItem(TEXT("APlayerController"), TEXT("APlayerController"), EIntelliSenseCategory::Type,
+		TEXT("class APlayerController : public AController"),
+		TEXT("Base class for player controllers that consume input and translate player actions into Pawn movement or gameplay actions."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/player-controllers-in-unreal-engine"));
+
+	AddItem(TEXT("AGameModeBase"), TEXT("AGameModeBase"), EIntelliSenseCategory::Type,
+		TEXT("class AGameModeBase : public AInfo"),
+		TEXT("Defines the rules of the game being played, default pawn and controller classes, spectator rules, and match lifecycle."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/game-mode-and-game-state-in-unreal-engine"));
+
+	AddItem(TEXT("UObject"), TEXT("UObject"), EIntelliSenseCategory::Type,
+		TEXT("class UObject"),
+		TEXT("The base class of all Unreal Engine objects. Provides garbage collection, reflection metadata, serialization, and networking support."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/objects-in-unreal-engine"));
+
+	AddItem(TEXT("UWorld"), TEXT("UWorld"), EIntelliSenseCategory::Type,
+		TEXT("class UWorld : public UObject"),
+		TEXT("Top-level simulation container representing a map or virtual environment, housing Levels, Actors, physics scenes, and timers."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-uclasses"));
+
+	AddItem(TEXT("UActorComponent"), TEXT("UActorComponent"), EIntelliSenseCategory::Type,
+		TEXT("class UActorComponent : public UObject"),
+		TEXT("Base class for components providing reusable, modular behaviors and functionality that can be attached to Actors."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("USceneComponent"), TEXT("USceneComponent"), EIntelliSenseCategory::Type,
+		TEXT("class USceneComponent : public UActorComponent"),
+		TEXT("ActorComponent that possesses a transform (location, rotation, scale) and supports hierarchical attachment to other SceneComponents."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("UPrimitiveComponent"), TEXT("UPrimitiveComponent"), EIntelliSenseCategory::Type,
+		TEXT("class UPrimitiveComponent : public USceneComponent"),
+		TEXT("SceneComponent that contains or generates geometry for rendering and physics simulation (e.g. static meshes, collision shapes)."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("UStaticMeshComponent"), TEXT("UStaticMeshComponent"), EIntelliSenseCategory::Type,
+		TEXT("class UStaticMeshComponent : public UMeshComponent"),
+		TEXT("Renders an instance of a static mesh asset and handles collision, physics, and material assignments."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("USkeletalMeshComponent"), TEXT("USkeletalMeshComponent"), EIntelliSenseCategory::Type,
+		TEXT("class USkeletalMeshComponent : public USkinnedMeshComponent"),
+		TEXT("Renders an animated 3D character or skeletal asset with bone hierarchy, skinning, morph targets, and physics simulation."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("UCameraComponent"), TEXT("UCameraComponent"), EIntelliSenseCategory::Type,
+		TEXT("class UCameraComponent : public USceneComponent"),
+		TEXT("Represents a camera viewpoint and perspective projection settings inside an Actor."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("USpringArmComponent"), TEXT("USpringArmComponent"), EIntelliSenseCategory::Type,
+		TEXT("class USpringArmComponent : public USceneComponent"),
+		TEXT("Maintains a fixed distance from parent component (camera boom) and automatically retracts on geometry collision."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("UGameplayStatics"), TEXT("UGameplayStatics"), EIntelliSenseCategory::Type,
+		TEXT("class UGameplayStatics : public UBlueprintFunctionLibrary"),
+		TEXT("Static helper library for common gameplay actions: spawning actors, playing sounds, particle effects, damage, and level opening."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/gameplay-statics-in-unreal-engine"));
+
+	AddItem(TEXT("FRotator"), TEXT("FRotator"), EIntelliSenseCategory::Type,
+		TEXT("struct FRotator(float InPitch, float InYaw, float InRoll)"),
+		TEXT("Rotation angle container defining orientation using Pitch (Y-axis), Yaw (Z-axis), and Roll (X-axis) in degrees."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/frotator-in-unreal-engine"));
+
+	AddItem(TEXT("FTransform"), TEXT("FTransform"), EIntelliSenseCategory::Type,
+		TEXT("struct FTransform(const FQuat& InRot, const FVector& InTranslation, const FVector& InScale3D)"),
+		TEXT("Combines 3D translation (FVector), rotation (FQuat), and 3D scale into a unified spatial transformation."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/ftransform-in-unreal-engine"));
+
+	AddItem(TEXT("TSubclassOf"), TEXT("TSubclassOf<"), EIntelliSenseCategory::Type,
+		TEXT("template<class TClass> class TSubclassOf"),
+		TEXT("Type-safe template wrapper around UClass* that guarantees the assigned class derives from TClass."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/tsubclassof-in-unreal-engine"));
+
+	AddItem(TEXT("TObjectPtr"), TEXT("TObjectPtr<"), EIntelliSenseCategory::Type,
+		TEXT("template<class T> class TObjectPtr"),
+		TEXT("Unreal Engine 5 smart pointer for UObject member properties. Supports lazy-loading, editor tracking, and 64-bit handle resolution."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-5-migration-guide"));
+
+	AddItem(TEXT("TWeakObjectPtr"), TEXT("TWeakObjectPtr<"), EIntelliSenseCategory::Type,
+		TEXT("template<class T> class TWeakObjectPtr"),
+		TEXT("Weak reference to a UObject that automatically clears if the underlying object is garbage collected."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/objects-in-unreal-engine"));
+
+	AddItem(TEXT("BeginPlay"), TEXT("BeginPlay()"), EIntelliSenseCategory::Method,
+		TEXT("virtual void BeginPlay() override;"),
+		TEXT("Called when the game starts or when this Actor is spawned into the world. Ideal for initialization logic requiring a valid world."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("Tick"), TEXT("Tick(DeltaTime)"), EIntelliSenseCategory::Method,
+		TEXT("virtual void Tick(float DeltaTime) override;"),
+		TEXT("Called every frame to update this Actor. DeltaTime provides the elapsed time in seconds since the previous frame."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("EndPlay"), TEXT("EndPlay("), EIntelliSenseCategory::Method,
+		TEXT("virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;"),
+		TEXT("Called when this Actor is being removed from the level, destroyed, or when the game ends."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("GetWorld"), TEXT("GetWorld()"), EIntelliSenseCategory::Method,
+		TEXT("UWorld* GetWorld() const;"),
+		TEXT("Returns pointer to the UWorld simulation context that this Actor or Object resides in."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("CreateDefaultSubobject"), TEXT("CreateDefaultSubobject<"), EIntelliSenseCategory::Method,
+		TEXT("template<class TReturnType> TReturnType* CreateDefaultSubobject(FName SubobjectName);"),
+		TEXT("Instantiates and registers a default subobject component inside an Actor constructor."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("SetupPlayerInputComponent"), TEXT("SetupPlayerInputComponent("), EIntelliSenseCategory::Method,
+		TEXT("virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;"),
+		TEXT("Allows a Pawn or Character to bind player input actions and axes to member functions."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/pawns-in-unreal-engine"));
+
+	AddItem(TEXT("SetActorLocation"), TEXT("SetActorLocation("), EIntelliSenseCategory::Method,
+		TEXT("bool SetActorLocation(const FVector& NewLocation, bool bSweep = false, FHitResult* OutSweepHitResult = nullptr);"),
+		TEXT("Moves the Actor root component to the specified world location, with optional collision sweep."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("GetActorLocation"), TEXT("GetActorLocation()"), EIntelliSenseCategory::Method,
+		TEXT("FVector GetActorLocation() const;"),
+		TEXT("Returns current world coordinates location of the Actor root component."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("SetActorRotation"), TEXT("SetActorRotation("), EIntelliSenseCategory::Method,
+		TEXT("bool SetActorRotation(FRotator NewRotation);"),
+		TEXT("Sets world space orientation of the Actor root component."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("GetActorRotation"), TEXT("GetActorRotation()"), EIntelliSenseCategory::Method,
+		TEXT("FRotator GetActorRotation() const;"),
+		TEXT("Returns current world space orientation (Pitch, Yaw, Roll) of the Actor."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("AttachToComponent"), TEXT("AttachToComponent("), EIntelliSenseCategory::Method,
+		TEXT("bool AttachToComponent(USceneComponent* Parent, const FAttachmentTransformRules& AttachmentRules, FName SocketName = NAME_None);"),
+		TEXT("Attaches this scene component to a parent component or skeletal socket."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/components-in-unreal-engine"));
+
+	AddItem(TEXT("Destroy"), TEXT("Destroy()"), EIntelliSenseCategory::Method,
+		TEXT("virtual bool Destroy(bool bNetForce = false, bool bShouldModifyLevel = true);"),
+		TEXT("Destroys this Actor and schedules it for garbage collection removal from the level."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("DeltaTime"), TEXT("DeltaTime"), EIntelliSenseCategory::Variable,
+		TEXT("float DeltaTime"),
+		TEXT("Frame time elapsed in seconds passed into Tick functions for frame-rate-independent physics and movement."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/actors-in-unreal-engine"));
+
+	AddItem(TEXT("Super"), TEXT("Super::"), EIntelliSenseCategory::Keyword,
+		TEXT("Super::MethodName(...)"),
+		TEXT("Convenience typedef injected by GENERATED_BODY() to invoke the immediate parent class implementation."),
+		TEXT("https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-uclasses"));
 }
 
 void SCppEditorPane::UpdateIntelliSense()
@@ -3616,11 +3789,11 @@ FMargin SCppEditorPane::GetHoverDocMargin() const
 			FVector2D LocalPos = ParentGeo.AbsoluteToLocal(HoverDocScreenPosition);
 
 			float X = (float)LocalPos.X + 8.0f;
-			float Y = (float)LocalPos.Y + 16.0f;
+			float Y = (float)LocalPos.Y + 22.0f;
 
 			FVector2D LocalSize = (FVector2D)ParentGeo.GetLocalSize();
-			const float CardWidth = 380.0f;
-			const float CardHeight = 120.0f;
+			const float CardWidth = 400.0f;
+			const float CardHeight = 130.0f;
 
 			if (X + CardWidth > LocalSize.X - 10.0f)
 			{
@@ -3628,7 +3801,7 @@ FMargin SCppEditorPane::GetHoverDocMargin() const
 			}
 			if (Y + CardHeight > LocalSize.Y - 10.0f)
 			{
-				Y = FMath::Max(10.0f, (float)(LocalPos.Y - CardHeight - 8.0f));
+				Y = FMath::Max(10.0f, (float)(LocalPos.Y - CardHeight - 12.0f));
 			}
 
 			return FMargin(FMath::Max(0.0f, X), FMath::Max(0.0f, Y), 0.0f, 0.0f);
@@ -3660,7 +3833,11 @@ FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
 		return FString();
 	}
 
-	const float LineHeight = 18.0f;
+	FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont();
+	TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+	const float MeasuredLineHeight = (float)FontMeasure->GetMaxCharacterHeight(FontInfo);
+	const float LineHeight = FMath::Max(18.0f, MeasuredLineHeight + 4.0f);
+
 	int32 FirstLine = 0;
 	if (CodeTextBox->GetVScrollBar().IsValid())
 	{
@@ -3688,9 +3865,6 @@ FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
 		return FString();
 	}
 
-	FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont();
-	TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
-
 	// Estimate character position by measuring substrings
 	float TargetX = (float)LocalPos.X - 4.0f;
 	if (TargetX < 0.0f)
@@ -3699,16 +3873,18 @@ FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
 	}
 
 	int32 FoundCharIdx = INDEX_NONE;
-	for (int32 i = 0; i <= Line.Len(); ++i)
+	float LastMeasuredX = 0.0f;
+	for (int32 i = 1; i <= Line.Len(); ++i)
 	{
 		FString Sub = Line.Left(i);
 		Sub.ReplaceInline(TEXT("\t"), TEXT("    "));
 		float MeasuredX = (float)FontMeasure->Measure(Sub, FontInfo).X;
-		if (MeasuredX >= TargetX)
+		if (TargetX >= LastMeasuredX && TargetX <= MeasuredX)
 		{
-			FoundCharIdx = FMath::Max(0, i - 1);
+			FoundCharIdx = i - 1;
 			break;
 		}
+		LastMeasuredX = MeasuredX;
 	}
 
 	if (FoundCharIdx == INDEX_NONE || !Line.IsValidIndex(FoundCharIdx))
@@ -3846,6 +4022,124 @@ TSharedPtr<FIntelliSenseItem> SCppEditorPane::FindDocItemForWord(const FString& 
 		if (Sym->DisplayText.Equals(Word, ESearchCase::IgnoreCase))
 		{
 			return Sym;
+		}
+	}
+
+	// 4. Dynamic inspection of active document lines to find definition/declaration of Word
+	if (ActiveDocumentIndex >= 0 && ActiveDocumentIndex < OpenDocuments.Num())
+	{
+		const FString& Content = OpenDocuments[ActiveDocumentIndex]->CurrentContent;
+		FString CurrentFileName = OpenDocuments[ActiveDocumentIndex]->Filename;
+		TArray<FString> Lines;
+		Content.ParseIntoArrayLines(Lines, false);
+
+		for (const FString& RawLine : Lines)
+		{
+			FString Line = RawLine.TrimStartAndEnd();
+			if (Line.IsEmpty() || Line.StartsWith(TEXT("//")) || Line.StartsWith(TEXT("/*")))
+			{
+				continue;
+			}
+
+			// Check if line contains Word as a distinct identifier
+			int32 FoundIdx = Line.Find(Word);
+			if (FoundIdx != INDEX_NONE)
+			{
+				// Verify word boundaries
+				bool bStartOk = (FoundIdx == 0) || (!FChar::IsAlnum(Line[FoundIdx - 1]) && Line[FoundIdx - 1] != TEXT('_'));
+				int32 EndIdx = FoundIdx + Word.Len();
+				bool bEndOk = (EndIdx >= Line.Len()) || (!FChar::IsAlnum(Line[EndIdx]) && Line[EndIdx] != TEXT('_'));
+
+				if (bStartOk && bEndOk)
+				{
+					// Class or struct definition
+					if (Line.Contains(TEXT("class ")) || Line.Contains(TEXT("struct ")))
+					{
+						TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+						Item->DisplayText = Word;
+						Item->Category = EIntelliSenseCategory::Type;
+						Item->Signature = Line;
+						Item->Description = FString::Printf(TEXT("User type '%s' declared in %s"), *Word, *CurrentFileName);
+						return Item;
+					}
+
+					// Function declaration (has '(' and ')' or starts with virtual)
+					if (Line.Contains(TEXT("(")) && Line.Contains(TEXT(")")))
+					{
+						TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+						Item->DisplayText = Word;
+						Item->Category = EIntelliSenseCategory::Method;
+						Item->Signature = Line;
+						Item->Description = FString::Printf(TEXT("Member function '%s' declared in %s"), *Word, *CurrentFileName);
+						return Item;
+					}
+
+					// Variable declaration (ends with ';' or has '=')
+					if (Line.EndsWith(TEXT(";")) || Line.Contains(TEXT("=")))
+					{
+						TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+						Item->DisplayText = Word;
+						Item->Category = EIntelliSenseCategory::Variable;
+						Item->Signature = Line;
+						Item->Description = FString::Printf(TEXT("Member or local variable '%s' declared in %s"), *Word, *CurrentFileName);
+						return Item;
+					}
+				}
+			}
+		}
+	}
+
+	// 5. Intelligent Unreal Engine naming convention heuristics fallback
+	if (Word.Len() >= 2 && FChar::IsUpper(Word[0]))
+	{
+		TCHAR Prefix = Word[0];
+		if (FChar::IsUpper(Word[1]))
+		{
+			if (Prefix == TEXT('A'))
+			{
+				TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+				Item->DisplayText = Word;
+				Item->Category = EIntelliSenseCategory::Type;
+				Item->Signature = FString::Printf(TEXT("class %s : public AActor"), *Word);
+				Item->Description = FString::Printf(TEXT("Unreal Engine Actor-derived class '%s'."), *Word);
+				return Item;
+			}
+			else if (Prefix == TEXT('U'))
+			{
+				TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+				Item->DisplayText = Word;
+				Item->Category = EIntelliSenseCategory::Type;
+				Item->Signature = FString::Printf(TEXT("class %s : public UObject"), *Word);
+				Item->Description = FString::Printf(TEXT("Unreal Engine UObject or Component class '%s'."), *Word);
+				return Item;
+			}
+			else if (Prefix == TEXT('F'))
+			{
+				TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+				Item->DisplayText = Word;
+				Item->Category = EIntelliSenseCategory::Type;
+				Item->Signature = FString::Printf(TEXT("struct %s"), *Word);
+				Item->Description = FString::Printf(TEXT("Unreal Engine value struct or utility type '%s'."), *Word);
+				return Item;
+			}
+			else if (Prefix == TEXT('S'))
+			{
+				TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+				Item->DisplayText = Word;
+				Item->Category = EIntelliSenseCategory::Type;
+				Item->Signature = FString::Printf(TEXT("class %s : public SCompoundWidget"), *Word);
+				Item->Description = FString::Printf(TEXT("Slate UI widget class '%s'."), *Word);
+				return Item;
+			}
+			else if (Prefix == TEXT('E'))
+			{
+				TSharedPtr<FIntelliSenseItem> Item = MakeShared<FIntelliSenseItem>();
+				Item->DisplayText = Word;
+				Item->Category = EIntelliSenseCategory::Enum;
+				Item->Signature = FString::Printf(TEXT("enum class %s : uint8"), *Word);
+				Item->Description = FString::Printf(TEXT("Unreal Engine enumeration '%s'."), *Word);
+				return Item;
+			}
 		}
 	}
 
@@ -4883,7 +5177,8 @@ void SCppEditorPane::Tick(const FGeometry& AllottedGeometry, const double InCurr
 	if (FSlateApplication::IsInitialized())
 	{
 		FVector2D CurrentCursorPos = FSlateApplication::Get().GetCursorPos();
-		if (FVector2D::Distance(CurrentCursorPos, LastMouseScreenPosition) > 3.0f)
+		const float MoveDist = FVector2D::Distance(CurrentCursorPos, LastMouseScreenPosition);
+		if (MoveDist > 3.0f)
 		{
 			LastMouseScreenPosition = CurrentCursorPos;
 			LastMouseMoveTime = FPlatformTime::Seconds();
@@ -4897,13 +5192,16 @@ void SCppEditorPane::Tick(const FGeometry& AllottedGeometry, const double InCurr
 					FGeometry CardGeo = HoverDocCard->GetTickSpaceGeometry();
 					FVector2D CardLocal = CardGeo.AbsoluteToLocal(CurrentCursorPos);
 					FVector2D CardSize = (FVector2D)CardGeo.GetLocalSize();
-					if (CardLocal.X >= 0.0f && CardLocal.X <= CardSize.X && CardLocal.Y >= 0.0f && CardLocal.Y <= CardSize.Y)
+					if (CardLocal.X >= -10.0f && CardLocal.X <= CardSize.X + 10.0f &&
+					    CardLocal.Y >= -10.0f && CardLocal.Y <= CardSize.Y + 10.0f)
 					{
 						bOverCard = true;
 					}
 				}
 
-				if (!bOverCard)
+				// Stay open if cursor is over the card OR still within 45 pixels of the trigger location (the word)
+				const float DistFromWord = FVector2D::Distance(CurrentCursorPos, HoverDocScreenPosition);
+				if (!bOverCard && DistFromWord > 45.0f)
 				{
 					DismissHoverDoc();
 				}
@@ -4913,12 +5211,33 @@ void SCppEditorPane::Tick(const FGeometry& AllottedGeometry, const double InCurr
 		{
 			// Mouse has been stationary
 			const double StationaryDuration = FPlatformTime::Seconds() - LastMouseMoveTime;
-			if (StationaryDuration >= 0.350 && !bHoverDocVisible && !bIntelliSenseActive)
+			if (StationaryDuration >= 0.250 && !bIntelliSenseActive)
 			{
 				FString HoveredWord = GetWordAtScreenPosition(CurrentCursorPos);
-				if (!HoveredWord.IsEmpty() && HoveredWord != LastHoveredWord)
+				if (!HoveredWord.IsEmpty())
 				{
-					ShowHoverDoc(HoveredWord, CurrentCursorPos);
+					if (!bHoverDocVisible || HoveredWord != LastHoveredWord)
+					{
+						ShowHoverDoc(HoveredWord, CurrentCursorPos);
+					}
+				}
+				else if (bHoverDocVisible)
+				{
+					bool bOverCard = false;
+					if (HoverDocCard.IsValid() && HoverDocCard->GetVisibility() == EVisibility::Visible)
+					{
+						FGeometry CardGeo = HoverDocCard->GetTickSpaceGeometry();
+						FVector2D CardLocal = CardGeo.AbsoluteToLocal(CurrentCursorPos);
+						FVector2D CardSize = (FVector2D)CardGeo.GetLocalSize();
+						if (CardLocal.X >= 0.0f && CardLocal.X <= CardSize.X && CardLocal.Y >= 0.0f && CardLocal.Y <= CardSize.Y)
+						{
+							bOverCard = true;
+						}
+					}
+					if (!bOverCard)
+					{
+						DismissHoverDoc();
+					}
 				}
 			}
 		}
