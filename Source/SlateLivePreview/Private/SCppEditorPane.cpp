@@ -3,6 +3,7 @@
 #include "SCppEditorPane.h"
 #include "SlateLivePreviewStyle.h"
 #include "CppSyntaxHighlighter.h"
+#include "CppEditorSettings.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -79,7 +80,7 @@ public:
 			AllottedGeometry.ToPaintGeometry(),
 			BackgroundBrush,
 			ESlateDrawEffect::None,
-			FLinearColor(0.08f, 0.082f, 0.09f, 1.0f)
+			FCppEditorSettings::Get().GetGutterBackgroundColor()
 		);
 
 		// 2. Right dividing border line
@@ -123,7 +124,7 @@ public:
 		int32 VisibleLines = FMath::CeilToInt(Height / LineHeight) + 2;
 		int32 LastLine = FMath::Min(TotalLines - 1, FirstLine + VisibleLines);
 
-		FSlateFontInfo FontInfo = FCppSyntaxHighlighterMarshaller::GetEditorFont(9.0f);
+		FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont(9.0f);
 
 		for (int32 LineIdx = FirstLine; LineIdx <= LastLine; ++LineIdx)
 		{
@@ -172,12 +173,13 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 	OnPaneFocused = InArgs._OnPaneFocused;
 	OnMoveDocumentRequested = InArgs._OnMoveDocumentRequested;
 
-	SyntaxMarshaller = FCppSyntaxHighlighterMarshaller::CreateDefaultDark();
+	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+	SyntaxMarshaller = FCppSyntaxHighlighterMarshaller::Create(Settings.GetSyntaxStyle());
 
 	CodeTextBox = SNew(SMultiLineEditableTextBox)
 		.Marshaller(SyntaxMarshaller)
-		.Font(FCppSyntaxHighlighterMarshaller::GetEditorFont(11.0f))
-		.AutoWrapText(false)
+		.Font_Lambda([]() { return FCppEditorSettings::Get().GetFont(); })
+		.AutoWrapText(Settings.bWordWrap)
 		.ClearKeyboardFocusOnCommit(false)
 		.ModiferKeyForNewLine(EModifierKey::None)
 		.ClearTextSelectionOnFocusLoss(false)
@@ -195,8 +197,11 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 		})
 		.OnTextChanged(this, &SCppEditorPane::OnCodeTextChanged);
 
-	TSharedPtr<SCppEditorGutter> GutterWidget = SNew(SCppEditorGutter, this)
+	SAssignNew(GutterWidget, SCppEditorGutter, this)
 		.TargetTextBox(CodeTextBox);
+	GutterWidget->SetVisibility(Settings.bShowLineNumbers ? EVisibility::Visible : EVisibility::Collapsed);
+
+	SettingsChangedHandle = FCppEditorSettings::Get().OnSettingsChanged.AddSP(this, &SCppEditorPane::ApplySettings);
 
 	ChildSlot
 	[
@@ -482,7 +487,7 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 		.Padding(0.0f)
 		[
 			SNew(SBorder)
-			.BorderBackgroundColor(FLinearColor(0.07f, 0.07f, 0.07f, 1.0f))
+			.BorderBackgroundColor_Lambda([]() { return FCppEditorSettings::Get().GetEditorBackgroundColor(); })
 			.Padding(2.0f)
 			[
 				SNew(SOverlay)
@@ -688,9 +693,17 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 				.Padding(8.0f, 0.0f)
 				[
 					SNew(STextBlock)
-					.Text(FText::FromString(TEXT("Spaces: 4")))
 					.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8.0f))
 					.ColorAndOpacity(FLinearColor(0.6f, 0.6f, 0.6f, 1.0f))
+					.Text_Lambda([]()
+					{
+						switch (FCppEditorSettings::Get().TabSize)
+						{
+						case ECppTabSize::TwoSpaces: return FText::FromString(TEXT("Spaces: 2"));
+						case ECppTabSize::TabCharacter: return FText::FromString(TEXT("Tab Size: 4"));
+						default: return FText::FromString(TEXT("Spaces: 4"));
+						}
+					})
 				]
 
 				// Encoding
@@ -732,6 +745,43 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 	];
 
 	RebuildTabStrip();
+}
+
+SCppEditorPane::~SCppEditorPane()
+{
+	if (SettingsChangedHandle.IsValid())
+	{
+		FCppEditorSettings::Get().OnSettingsChanged.Remove(SettingsChangedHandle);
+		SettingsChangedHandle.Reset();
+	}
+}
+
+void SCppEditorPane::ApplySettings()
+{
+	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+
+	// 1. Update Syntax Highlighter Marshaller with new theme colors
+	if (SyntaxMarshaller.IsValid())
+	{
+		SyntaxMarshaller->SetSyntaxStyle(Settings.GetSyntaxStyle());
+	}
+	if (CodeTextBox.IsValid())
+	{
+		CodeTextBox->SetAutoWrapText(Settings.bWordWrap);
+		CodeTextBox->Refresh();
+	}
+
+	// 2. Update Gutter visibility
+	if (GutterWidget.IsValid())
+	{
+		GutterWidget->SetVisibility(Settings.bShowLineNumbers ? EVisibility::Visible : EVisibility::Collapsed);
+	}
+
+	// 3. Dismiss IntelliSense if disabled
+	if (!Settings.bEnableIntelliSense && bIntelliSenseActive)
+	{
+		DismissIntelliSense();
+	}
 }
 
 bool SCppEditorPane::OpenFile(const FString& InFilePath)
@@ -2659,6 +2709,12 @@ void SCppEditorPane::EnsureIntelliSenseDatabaseLoaded()
 
 void SCppEditorPane::UpdateIntelliSense()
 {
+	if (!FCppEditorSettings::Get().bEnableIntelliSense)
+	{
+		DismissIntelliSense();
+		return;
+	}
+
 	EnsureIntelliSenseDatabaseLoaded();
 
 	if (!CodeTextBox.IsValid() || ActiveDocumentIndex == INDEX_NONE || ActiveDocumentIndex >= OpenDocuments.Num())
@@ -3447,6 +3503,58 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyChar(const FGeometry& MyGeometry, con
 		return FReply::Handled();
 	}
 
+	const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+
+	// Auto-close brackets & quotes if enabled
+	if (Settings.bAutoCloseBrackets && CodeTextBox.IsValid())
+	{
+		FTextLocation CursorLoc = CodeTextBox->GetCursorLocation();
+		FString CurrentLine;
+		CodeTextBox->GetCurrentTextLine(CurrentLine);
+		int32 Col = CursorLoc.GetOffset();
+
+		// Skip-over closing punctuation if already present directly at cursor
+		if ((Char == TEXT(')') || Char == TEXT(']') || Char == TEXT('}') || Char == TEXT('"') || Char == TEXT('\'')) &&
+			Col < CurrentLine.Len() && CurrentLine[Col] == Char)
+		{
+			FTextLocation NewLoc(CursorLoc.GetLineIndex(), Col + 1);
+			CodeTextBox->GoTo(NewLoc);
+			CodeTextBox->ScrollTo(NewLoc);
+			return FReply::Handled();
+		}
+
+		// Auto-insert matching pair
+		FString Pair;
+		if (Char == TEXT('(')) Pair = TEXT("()");
+		else if (Char == TEXT('[')) Pair = TEXT("[]");
+		else if (Char == TEXT('{')) Pair = TEXT("{}");
+		else if (Char == TEXT('"'))
+		{
+			bool bPrecededByAlnum = (Col > 0 && FChar::IsAlnum(CurrentLine[Col - 1]));
+			if (!bPrecededByAlnum)
+			{
+				Pair = TEXT("\"\"");
+			}
+		}
+		else if (Char == TEXT('\''))
+		{
+			bool bPrecededByAlnum = (Col > 0 && FChar::IsAlnum(CurrentLine[Col - 1]));
+			if (!bPrecededByAlnum)
+			{
+				Pair = TEXT("''");
+			}
+		}
+
+		if (!Pair.IsEmpty())
+		{
+			CodeTextBox->InsertTextAtCursor(Pair);
+			FTextLocation NewLoc(CursorLoc.GetLineIndex(), Col + 1);
+			CodeTextBox->GoTo(NewLoc);
+			CodeTextBox->ScrollTo(NewLoc);
+			return FReply::Handled();
+		}
+	}
+
 	return FReply::Unhandled();
 }
 
@@ -3482,7 +3590,8 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, con
 	// 2. Smart Enter: preserve indentation level of current line and auto-indent on '{' or ':'
 	if (Key == EKeys::Enter && !InKeyEvent.IsControlDown() && !InKeyEvent.IsAltDown())
 	{
-		if (CodeTextBox.IsValid())
+		const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+		if (Settings.bAutoIndent && CodeTextBox.IsValid())
 		{
 			FString CurrentLine;
 			CodeTextBox->GetCurrentTextLine(CurrentLine);
@@ -3504,10 +3613,25 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, con
 				}
 			}
 
+			// Single indent step based on settings
+			FString IndentStep;
+			if (Settings.TabSize == ECppTabSize::TwoSpaces)
+			{
+				IndentStep = TEXT("  ");
+			}
+			else if (Settings.TabSize == ECppTabSize::TabCharacter)
+			{
+				IndentStep = TEXT("\t");
+			}
+			else
+			{
+				IndentStep = TEXT("    ");
+			}
+
 			// Check if line before cursor increases indent
 			FString TextBeforeCursor = CurrentLine.Left(Col).TrimEnd();
 			bool bIncreaseIndent = TextBeforeCursor.EndsWith(TEXT("{")) || TextBeforeCursor.EndsWith(TEXT(":"));
-			FString NextIndent = Indent + (bIncreaseIndent ? TEXT("    ") : TEXT(""));
+			FString NextIndent = Indent + (bIncreaseIndent ? IndentStep : TEXT(""));
 
 			// Check if cursor is between '{' and '}'
 			FString TextAfterCursor = CurrentLine.Mid(Col).TrimStart();
@@ -3531,47 +3655,54 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, con
 		}
 	}
 
-	// 3. Tab key handling when IntelliSense is not active: insert spaces to next 4-space tab stop
+	// 3. Tab key handling when IntelliSense is not active: insert spaces to tab stop or tab character
 	if (Key == EKeys::Tab && !InKeyEvent.IsControlDown() && !InKeyEvent.IsAltDown())
 	{
 		if (CodeTextBox.IsValid())
 		{
-			FTextLocation CursorLoc = CodeTextBox->GetCursorLocation();
-			int32 SpacesToNextTabStop = 4 - (CursorLoc.GetOffset() % 4);
-			if (SpacesToNextTabStop <= 0)
+			const FCppEditorSettings& Settings = FCppEditorSettings::Get();
+			if (Settings.TabSize == ECppTabSize::TabCharacter)
 			{
-				SpacesToNextTabStop = 4;
+				CodeTextBox->InsertTextAtCursor(TEXT("\t"));
 			}
-			FString IndentSpaces = FString::ChrN(SpacesToNextTabStop, TEXT(' '));
-			CodeTextBox->InsertTextAtCursor(IndentSpaces);
+			else
+			{
+				int32 TabWidth = (Settings.TabSize == ECppTabSize::TwoSpaces) ? 2 : 4;
+				FTextLocation CursorLoc = CodeTextBox->GetCursorLocation();
+				int32 SpacesToNextTabStop = TabWidth - (CursorLoc.GetOffset() % TabWidth);
+				if (SpacesToNextTabStop <= 0)
+				{
+					SpacesToNextTabStop = TabWidth;
+				}
+				FString IndentSpaces = FString::ChrN(SpacesToNextTabStop, TEXT(' '));
+				CodeTextBox->InsertTextAtCursor(IndentSpaces);
+			}
 		}
 		return FReply::Handled();
 	}
 
-	// 4. Smart Backspace: delete 4 spaces at once when at leading indent
+	// 4. Smart Backspace: delete matching pairs or indent spaces
 	if (Key == EKeys::BackSpace && !InKeyEvent.IsControlDown() && !InKeyEvent.IsAltDown())
 	{
 		if (CodeTextBox.IsValid() && !CodeTextBox->AnyTextSelected() && ActiveDocumentIndex >= 0 && ActiveDocumentIndex < OpenDocuments.Num())
 		{
+			const FCppEditorSettings& Settings = FCppEditorSettings::Get();
 			FTextLocation CursorLoc = CodeTextBox->GetCursorLocation();
 			int32 Col = CursorLoc.GetOffset();
 			int32 LineIndex = CursorLoc.GetLineIndex();
 			FString CurrentLine;
 			CodeTextBox->GetCurrentTextLine(CurrentLine);
 
-			if (Col >= 4 && Col <= CurrentLine.Len())
+			// A. Delete auto-closed pair if cursor is right between them
+			if (Settings.bAutoCloseBrackets && Col > 0 && Col < CurrentLine.Len())
 			{
-				bool bOnlyLeadingSpaces = true;
-				for (int32 i = 0; i < Col; ++i)
-				{
-					if (CurrentLine[i] != TEXT(' '))
-					{
-						bOnlyLeadingSpaces = false;
-						break;
-					}
-				}
-
-				if (bOnlyLeadingSpaces && (Col % 4 == 0))
+				TCHAR Before = CurrentLine[Col - 1];
+				TCHAR After = CurrentLine[Col];
+				if ((Before == TEXT('(') && After == TEXT(')')) ||
+					(Before == TEXT('[') && After == TEXT(']')) ||
+					(Before == TEXT('{') && After == TEXT('}')) ||
+					(Before == TEXT('"') && After == TEXT('"')) ||
+					(Before == TEXT('\'') && After == TEXT('\'')))
 				{
 					TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
 					TArray<int32> LineOffsets;
@@ -3587,17 +3718,68 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, con
 					if (LineIndex < LineOffsets.Num())
 					{
 						int32 CharPos = LineOffsets[LineIndex] + Col;
-						if (CharPos >= 4 && CharPos <= Doc->CurrentContent.Len())
+						if (CharPos >= 1 && CharPos < Doc->CurrentContent.Len())
 						{
 							Doc->UndoHistory.Add(Doc->CurrentContent);
 							Doc->RedoHistory.Empty();
-							Doc->CurrentContent.RemoveAt(CharPos - 4, 4);
+							Doc->CurrentContent.RemoveAt(CharPos - 1, 2);
 							Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
 							Doc->bIsInternalTextChange = true;
 							CodeTextBox->SetText(FText::FromString(Doc->CurrentContent));
 							Doc->bIsInternalTextChange = false;
 
-							FTextLocation NewLoc(LineIndex, Col - 4);
+							FTextLocation NewLoc(LineIndex, Col - 1);
+							CodeTextBox->GoTo(NewLoc);
+							CodeTextBox->ScrollTo(NewLoc);
+
+							OnDocumentContentChanged.ExecuteIfBound(Doc->FilePath, Doc->CurrentContent);
+							return FReply::Handled();
+						}
+					}
+				}
+			}
+
+			// B. Delete indent width at once when at leading indent
+			int32 IndentWidth = (Settings.TabSize == ECppTabSize::TwoSpaces) ? 2 : 4;
+			if (Settings.TabSize != ECppTabSize::TabCharacter && Col >= IndentWidth && Col <= CurrentLine.Len())
+			{
+				bool bOnlyLeadingSpaces = true;
+				for (int32 i = 0; i < Col; ++i)
+				{
+					if (CurrentLine[i] != TEXT(' '))
+					{
+						bOnlyLeadingSpaces = false;
+						break;
+					}
+				}
+
+				if (bOnlyLeadingSpaces && (Col % IndentWidth == 0))
+				{
+					TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+					TArray<int32> LineOffsets;
+					LineOffsets.Add(0);
+					for (int32 i = 0; i < Doc->CurrentContent.Len(); ++i)
+					{
+						if (Doc->CurrentContent[i] == TEXT('\n'))
+						{
+							LineOffsets.Add(i + 1);
+						}
+					}
+
+					if (LineIndex < LineOffsets.Num())
+					{
+						int32 CharPos = LineOffsets[LineIndex] + Col;
+						if (CharPos >= IndentWidth && CharPos <= Doc->CurrentContent.Len())
+						{
+							Doc->UndoHistory.Add(Doc->CurrentContent);
+							Doc->RedoHistory.Empty();
+							Doc->CurrentContent.RemoveAt(CharPos - IndentWidth, IndentWidth);
+							Doc->bIsDirty = (Doc->CurrentContent != Doc->SavedContent);
+							Doc->bIsInternalTextChange = true;
+							CodeTextBox->SetText(FText::FromString(Doc->CurrentContent));
+							Doc->bIsInternalTextChange = false;
+
+							FTextLocation NewLoc(LineIndex, Col - IndentWidth);
 							CodeTextBox->GoTo(NewLoc);
 							CodeTextBox->ScrollTo(NewLoc);
 

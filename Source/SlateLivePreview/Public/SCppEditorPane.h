@@ -72,6 +72,7 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+	virtual ~SCppEditorPane() override;
 
 	bool OpenFile(const FString& InFilePath);
 	bool CloseFile(const FString& InFilePath);
@@ -131,7 +132,11 @@ private:
 	// Widgets
 	TSharedPtr<SHorizontalBox> TabStripBox;
 	TSharedPtr<SMultiLineEditableTextBox> CodeTextBox;
+	TSharedPtr<class SCppEditorGutter> GutterWidget;
 	TSharedPtr<FCppSyntaxHighlighterMarshaller> SyntaxMarshaller;
+	FDelegateHandle SettingsChangedHandle;
+
+	void ApplySettings();
 
 	// Find Bar Widgets
 	TSharedPtr<SBorder> FindBarBorder;

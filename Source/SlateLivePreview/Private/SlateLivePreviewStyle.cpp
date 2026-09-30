@@ -99,6 +99,7 @@ TSharedRef<FSlateStyleSet> FSlateLivePreviewStyle::Create()
 	Style->Set("SlateLivePreview.Duplicate", IMAGE_BRUSH(TEXT("Icons/Duplicate"), Icon16x16));
 	Style->Set("SlateLivePreview.Refresh", IMAGE_BRUSH(TEXT("Icons/Refresh"), Icon14x14));
 	Style->Set("SlateLivePreview.Snapshot", IMAGE_BRUSH(TEXT("Icons/Snapshot"), Icon14x14));
+	Style->Set("SlateLivePreview.Settings", IMAGE_BRUSH(TEXT("Icons/Settings"), Icon14x14));
 
 	// --- Class Wizard Cards (24x24) ---
 	Style->Set("SlateLivePreview.Class.Character", IMAGE_BRUSH(TEXT("Icons/Class_Character"), Icon24x24));

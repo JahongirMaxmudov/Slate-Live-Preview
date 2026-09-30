@@ -71,6 +71,8 @@ public:
 
 	virtual ~FCppSyntaxHighlighterMarshaller() override = default;
 
+	void SetSyntaxStyle(const FSyntaxTextStyle& InSyntaxTextStyle) { SyntaxTextStyle = InSyntaxTextStyle; }
+
 	// Return true so syntax highlighting updates live as the user edits code
 	virtual bool RequiresLiveUpdate() const override { return true; }
 

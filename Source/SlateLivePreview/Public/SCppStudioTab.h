@@ -105,6 +105,8 @@ private:
 	FReply OnTogglePreviewClicked();
 	FReply OnNewClassClicked();
 	FReply OnQuickOpenClicked();
+	FReply OnSettingsClicked();
+	void OpenSettingsDialog();
 
 	void UpdateFileHeader();
 	void SetStatus(const FString& StatusText, const FLinearColor& StatusColor);

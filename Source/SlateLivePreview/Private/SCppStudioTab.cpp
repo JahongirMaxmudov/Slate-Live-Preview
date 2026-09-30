@@ -6,6 +6,8 @@
 #include "SlateWidgetBuilder.h"
 #include "ILiveCodingModule.h"
 #include "SCreateClassDialog.h"
+#include "SCppSettingsDialog.h"
+#include "CppEditorSettings.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SSplitter.h"
 #include "Widgets/Layout/SBorder.h"
@@ -402,6 +404,36 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 							[
 								SNew(STextBlock)
 								.Text(FText::FromString(TEXT("Slate Preview")))
+							]
+						]
+					]
+
+					// 9. Settings
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(2.0f)
+					[
+						SNew(SButton)
+						.ToolTipText(FText::FromString(TEXT("Preferences: Theme, Font, Formatting, Behavior (Ctrl+,)")))
+						.OnClicked(this, &SCppStudioTab::OnSettingsClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.Settings")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Settings")))
 							]
 						]
 					]
@@ -858,7 +890,10 @@ void SCppStudioTab::Tick(const FGeometry& AllottedGeometry, const double InCurre
 void SCppStudioTab::OnPaneDocumentContentChanged(const FString& FilePath, const FString& Content)
 {
 	UpdateFileHeader();
-	UpdateSlatePreviewIfApplicable();
+	if (FCppEditorSettings::Get().bAutoReloadSlatePreview)
+	{
+		UpdateSlatePreviewIfApplicable();
+	}
 }
 
 void SCppStudioTab::SaveCurrentFile()
@@ -899,8 +934,11 @@ void SCppStudioTab::SaveAllFiles()
 
 void SCppStudioTab::TriggerLiveCoding()
 {
-	// 1. Save all files first
-	SaveAllFiles();
+	// 1. Save all files first (if enabled in settings)
+	if (FCppEditorSettings::Get().bAutoSaveOnLiveCoding)
+	{
+		SaveAllFiles();
+	}
 
 	// 2. Trigger Live Coding module
 	ILiveCodingModule* LiveCoding = FModuleManager::GetModulePtr<ILiveCodingModule>(LIVE_CODING_MODULE_NAME);
@@ -1535,6 +1573,17 @@ FReply SCppStudioTab::OnQuickOpenClicked()
 	return FReply::Handled();
 }
 
+FReply SCppStudioTab::OnSettingsClicked()
+{
+	OpenSettingsDialog();
+	return FReply::Handled();
+}
+
+void SCppStudioTab::OpenSettingsDialog()
+{
+	SCppSettingsDialog::OpenModal(AsShared());
+}
+
 FReply SCppStudioTab::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
@@ -1566,6 +1615,12 @@ FReply SCppStudioTab::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& In
 	if (Key == EKeys::F4)
 	{
 		OnErrorJumpClicked();
+		return FReply::Handled();
+	}
+
+	if (InKeyEvent.IsControlDown() && Key == EKeys::Comma)
+	{
+		OpenSettingsDialog();
 		return FReply::Handled();
 	}
 
