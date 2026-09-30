@@ -1,0 +1,30 @@
+{
+	"FileVersion": 3,
+	"Version": 10000,
+	"VersionName": "1.0.0",
+	"EngineVersion": "5.8.0",
+	"FriendlyName": "C++ Studio & Slate Live Preview",
+	"Description": "Integrated in-engine C++ code studio, dual-pane editor, project explorer, class wizard, and zero-compile Slate UI live previewer.",
+	"Category": "Editor",
+	"CreatedBy": "JMPingvin",
+	"CreatedByURL": "https://github.com/badbadgerentertainment-hue",
+	"DocsURL": "https://github.com/badbadgerentertainment-hue/Slate-Live-Preview",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/badbadgerentertainment-hue/Slate-Live-Preview/issues",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "SlateLivePreview",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
+		}
+	]
+}

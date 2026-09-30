@@ -1,0 +1,9 @@
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+*.pdb
+*.obj
+*.rsp
+*.dep.json
+*.sarif
