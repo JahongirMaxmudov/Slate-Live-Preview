@@ -49,6 +49,19 @@ enum class ECppTabSize : uint8
 DECLARE_MULTICAST_DELEGATE(FOnCppEditorSettingsChanged);
 
 /**
+ * Supported AI Providers for Copilot and Code Assistant
+ */
+enum class EAiProvider : uint8
+{
+	LocalOllama = 0,
+	LMStudio,
+	DeepSeek,
+	OpenAI,
+	Custom,
+	Count
+};
+
+/**
  * Central configuration manager for C++ Studio editor appearances and behaviors.
  * Persists user preferences to Unreal Engine config files (Saved/Config).
  */
@@ -76,6 +89,16 @@ public:
 	bool bAutoSaveOnLiveCoding = true;
 	bool bAutoReloadSlatePreview = true;
 
+	// AI Copilot & Assistant Settings
+	bool bEnableAiInlineCompletion = true;
+	EAiProvider AiProvider = EAiProvider::LocalOllama;
+	FString AiEndpoint = TEXT("http://localhost:11434/v1");
+	FString AiModel = TEXT("deepseek-coder");
+	FString AiApiKey;
+	int32 AiGhostTextDelayMs = 400;
+	int32 AiMaxTokens = 128;
+	float AiTemperature = 0.2f;
+
 	// Helpers for Slate widgets
 	FSlateFontInfo GetFont(float SizeOverride = -1.0f) const;
 	FSlateFontInfo GetFontBold(float SizeOverride = -1.0f) const;
@@ -86,6 +109,10 @@ public:
 	static FString GetThemeDisplayName(ECppEditorTheme InTheme);
 	static FString GetFontDisplayName(ECppEditorFont InFont);
 	static const TArray<int32>& GetAvailableFontSizes();
+
+	static FString GetAiProviderDisplayName(EAiProvider InProvider);
+	static FString GetDefaultEndpointForProvider(EAiProvider InProvider);
+	static FString GetDefaultModelForProvider(EAiProvider InProvider);
 
 	// Broadcast when any settings are saved/applied
 	FOnCppEditorSettingsChanged OnSettingsChanged;

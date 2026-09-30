@@ -7,9 +7,24 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/AppStyle.h"
+#include "Framework/Application/SlateApplication.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
+#include "Modules/ModuleManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+
+TWeakPtr<SSlateLivePreviewViewport> SSlateLivePreviewViewport::ActiveViewport = nullptr;
+
+TWeakPtr<SSlateLivePreviewViewport> SSlateLivePreviewViewport::GetActiveViewport()
+{
+	return ActiveViewport;
+}
 
 void SSlateLivePreviewViewport::Construct(const FArguments& InArgs)
 {
+	ActiveViewport = SharedThis(this);
+
 	ConstraintBox = SNew(SBox)
 		.HAlign(HAlign_Center)
 		.VAlign(VAlign_Center);
@@ -104,3 +119,42 @@ void SSlateLivePreviewViewport::UpdateSizeConstraint()
 		break;
 	}
 }
+
+bool SSlateLivePreviewViewport::SaveSnapshotToFile(const FString& InFilePath)
+{
+	FString TargetPath = InFilePath;
+	if (TargetPath.IsEmpty())
+	{
+		TargetPath = FPaths::ProjectSavedDir() / TEXT("SlateLivePreview/preview.png");
+	}
+
+	TSharedPtr<SWidget> WidgetToCapture = CurrentWidget.IsValid() ? CurrentWidget : AsShared();
+
+	TArray<FColor> ColorData;
+	FIntVector Size;
+	if (!FSlateApplication::Get().TakeScreenshot(WidgetToCapture.ToSharedRef(), ColorData, Size))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SlateLivePreview] Failed to take screenshot of viewport widget."));
+		return false;
+	}
+
+	if (ColorData.Num() == 0 || Size.X <= 0 || Size.Y <= 0)
+	{
+		return false;
+	}
+
+	IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+	TSharedPtr<IImageWrapper> ImageWrapper = ImageWrapperModule.CreateImageWrapper(EImageFormat::PNG);
+	if (ImageWrapper.IsValid() && ImageWrapper->SetRaw(ColorData.GetData(), ColorData.Num() * sizeof(FColor), Size.X, Size.Y, ERGBFormat::BGRA, 8))
+	{
+		const TArray64<uint8>& CompressedData = ImageWrapper->GetCompressed();
+		if (FFileHelper::SaveArrayToFile(CompressedData, *TargetPath))
+		{
+			UE_LOG(LogTemp, Display, TEXT("[SlateLivePreview] Snapshot successfully saved to: %s (%dx%d)"), *TargetPath, Size.X, Size.Y);
+			return true;
+		}
+	}
+
+	return false;
+}
+

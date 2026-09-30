@@ -58,7 +58,21 @@ private:
 	TSharedPtr<SMultiLineEditableTextBox> PreviewTextBox;
 	TSharedPtr<FCppSyntaxHighlighterMarshaller> PreviewMarshaller;
 
+	// AI Copilot Settings
+	bool bTempEnableAiInlineCompletion;
+	EAiProvider TempAiProvider;
+	FString TempAiEndpoint;
+	FString TempAiModel;
+	FString TempAiApiKey;
+	int32 TempAiGhostTextDelayMs;
+
+	TArray<TSharedPtr<FString>> AiProviderOptions;
+	TSharedPtr<FString> SelectedAiProviderOption;
+	TSharedPtr<STextBlock> AiTestStatusTextBlock;
+
 	void UpdatePreview();
+	void UpdateAiProviderDefaults();
+	FReply OnTestAiConnectionClicked();
 	FReply OnApplyClicked();
 	FReply OnResetClicked();
 	FReply OnCancelClicked();

@@ -106,8 +106,15 @@ public:
 	int32 GetCurrentLineIndex() const;
 	int32 GetCurrentColumnIndex() const;
 
-	friend class SCppEditorGutter;
+	void InsertCodeAtCursor(const FString& InCode);
+	bool HasGhostText() const { return bGhostTextVisible && !ActiveGhostText.IsEmpty(); }
+	FString GetActiveGhostText() const { return ActiveGhostText; }
+	FTextLocation GetGhostTextLocation() const { return GhostTextLocation; }
 
+	friend class SCppEditorGutter;
+	friend class SCppEditorGhostOverlay;
+
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
@@ -131,10 +138,25 @@ private:
 
 	// Widgets
 	TSharedPtr<SHorizontalBox> TabStripBox;
+	TSharedPtr<SHorizontalBox> BreadcrumbsBox;
 	TSharedPtr<SMultiLineEditableTextBox> CodeTextBox;
 	TSharedPtr<class SCppEditorGutter> GutterWidget;
+	TSharedPtr<class SCppEditorGhostOverlay> GhostOverlayWidget;
 	TSharedPtr<FCppSyntaxHighlighterMarshaller> SyntaxMarshaller;
 	FDelegateHandle SettingsChangedHandle;
+
+	// AI Copilot Ghost Text State
+	FString ActiveGhostText;
+	FTextLocation GhostTextLocation;
+	bool bGhostTextVisible = false;
+	double LastKeyStrokeTime = 0.0;
+	bool bPendingAiRequest = false;
+
+	void TriggerAiInlineCompletion();
+	void OnAiCompletionReceived(const FString& CompletionText, bool bSuccess, FTextLocation OriginalCursorLoc);
+	void CommitGhostText();
+	void DismissGhostText();
+	void UpdateBreadcrumbs();
 
 	void ApplySettings();
 

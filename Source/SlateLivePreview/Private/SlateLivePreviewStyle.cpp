@@ -77,6 +77,7 @@ TSharedRef<FSlateStyleSet> FSlateLivePreviewStyle::Create()
 	Style->Set("SlateLivePreview.Revert", IMAGE_BRUSH(TEXT("Icons/Revert"), Icon14x14));
 	Style->Set("SlateLivePreview.SplitView", IMAGE_BRUSH(TEXT("Icons/SplitView"), Icon14x14));
 	Style->Set("SlateLivePreview.SlatePreview", IMAGE_BRUSH(TEXT("Icons/SlatePreview"), Icon14x14));
+	Style->Set("SlateLivePreview.AIAssistant", IMAGE_BRUSH(TEXT("Icons/AIAssistant"), Icon14x14));
 
 	// --- Actions & Context Menus (16x16) ---
 	Style->Set("SlateLivePreview.QuickFix", IMAGE_BRUSH(TEXT("Icons/QuickFix"), Icon16x16));

@@ -7,6 +7,7 @@
 #include "ILiveCodingModule.h"
 #include "SCreateClassDialog.h"
 #include "SCppSettingsDialog.h"
+#include "SCppAiAssistantDrawer.h"
 #include "CppEditorSettings.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SSplitter.h"
@@ -437,6 +438,40 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 							]
 						]
 					]
+
+					// 10. AI Assistant Drawer Toggle
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(2.0f)
+					[
+						SNew(SButton)
+						.ButtonColorAndOpacity_Lambda([this]()
+						{
+							return bShowAiDrawer ? FLinearColor(0.22f, 0.42f, 0.72f, 1.0f) : FLinearColor(0.18f, 0.20f, 0.24f, 1.0f);
+						})
+						.ToolTipText(FText::FromString(TEXT("Toggle AI Copilot & Assistant Panel (Ollama, DeepSeek, OpenAI)")))
+						.OnClicked(this, &SCppStudioTab::OnToggleAiDrawerClicked)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+							[
+								SNew(SImage)
+								.Image(FSlateLivePreviewStyle::GetBrush(TEXT("SlateLivePreview.AIAssistant")))
+								.DesiredSizeOverride(FVector2D(14.0f, 14.0f))
+							]
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("AI Assistant")))
+							]
+						]
+					]
 				]
 			]
 
@@ -500,6 +535,18 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 								SlatePreviewViewport.ToSharedRef()
 							]
 						]
+					]
+
+					// Far Right: AI Assistant Drawer (Collapsible)
+					+ SSplitter::Slot()
+					.Value(0.25f)
+					[
+						SAssignNew(AiAssistantDrawer, SCppAiAssistantDrawer)
+						.OnInsertCodeToEditor(this, &SCppStudioTab::InsertCodeFromAi)
+						.OnCloseRequested_Lambda([this]()
+						{
+							ToggleAiDrawer(false);
+						})
 					]
 				]
 
@@ -704,6 +751,11 @@ void SCppStudioTab::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+
+	if (AiAssistantDrawer.IsValid())
+	{
+		AiAssistantDrawer->SetVisibility(EVisibility::Collapsed);
+	}
 
 	// Hook into Live Coding patch completion delegate
 	ILiveCodingModule* LiveCoding = FModuleManager::GetModulePtr<ILiveCodingModule>(LIVE_CODING_MODULE_NAME);
@@ -1222,6 +1274,39 @@ void SCppStudioTab::ToggleSlatePreview(bool bShow)
 	if (PreviewPanelBorder.IsValid())
 	{
 		PreviewPanelBorder->SetVisibility(bShow ? EVisibility::Visible : EVisibility::Collapsed);
+	}
+}
+
+FReply SCppStudioTab::OnToggleAiDrawerClicked()
+{
+	ToggleAiDrawer(!bShowAiDrawer);
+	return FReply::Handled();
+}
+
+void SCppStudioTab::ToggleAiDrawer(bool bShow)
+{
+	bShowAiDrawer = bShow;
+	if (AiAssistantDrawer.IsValid())
+	{
+		AiAssistantDrawer->SetVisibility(bShow ? EVisibility::Visible : EVisibility::Collapsed);
+		if (bShow)
+		{
+			AiAssistantDrawer->FocusInput();
+		}
+	}
+}
+
+void SCppStudioTab::InsertCodeFromAi(const FString& Code)
+{
+	TSharedPtr<SCppEditorPane> ActivePane = ActiveEditorPane.Pin();
+	if (!ActivePane.IsValid())
+	{
+		ActivePane = LeftEditorPane;
+	}
+	if (ActivePane.IsValid())
+	{
+		ActivePane->InsertCodeAtCursor(Code);
+		ActivePane->FocusEditor();
 	}
 }
 

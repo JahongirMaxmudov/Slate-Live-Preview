@@ -36,7 +36,13 @@ public:
 
 	TSharedPtr<SWidget> GetPreviewWidget() const { return CurrentWidget; }
 
+	/** Takes a screenshot of the preview and saves to PNG disk file */
+	bool SaveSnapshotToFile(const FString& InFilePath = FString());
+
+	static TWeakPtr<SSlateLivePreviewViewport> GetActiveViewport();
+
 private:
+	static TWeakPtr<SSlateLivePreviewViewport> ActiveViewport;
 	TSharedPtr<SBorder> ViewportBackgroundBorder;
 	TSharedPtr<class SBox> ConstraintBox;
 	TSharedPtr<SWidget> CurrentWidget;

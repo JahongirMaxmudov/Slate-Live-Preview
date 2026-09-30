@@ -14,6 +14,7 @@ class STextBlock;
 class SBorder;
 class SSplitter;
 class SSearchBox;
+class SCppAiAssistantDrawer;
 template<typename ItemType> class SListView;
 class ITableRow;
 class STableViewBase;
@@ -72,6 +73,9 @@ private:
 	int32 LastParsedErrorLine = 0;
 	int32 LastParsedErrorCol = 0;
 
+	TSharedPtr<SCppAiAssistantDrawer> AiAssistantDrawer;
+	bool bShowAiDrawer = false;
+
 	bool bIsSplitView = false;
 	bool bShowSlatePreview = true;
 	FString OutputConsoleAccumulator;
@@ -103,6 +107,9 @@ private:
 	FReply OnRevertClicked();
 	FReply OnToggleSplitClicked();
 	FReply OnTogglePreviewClicked();
+	FReply OnToggleAiDrawerClicked();
+	void ToggleAiDrawer(bool bShow);
+	void InsertCodeFromAi(const FString& Code);
 	FReply OnNewClassClicked();
 	FReply OnQuickOpenClicked();
 	FReply OnSettingsClicked();

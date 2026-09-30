@@ -4,6 +4,8 @@
 #include "SlateLivePreviewStyle.h"
 #include "CppSyntaxHighlighter.h"
 #include "CppEditorSettings.h"
+#include "CppAiAssistant.h"
+#include "Fonts/FontMeasure.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -140,6 +142,18 @@ public:
 			FString LineNumberStr = FString::FromInt(LineIdx + 1);
 
 			bool bIsCurrent = (LineIdx == CurrentLine);
+			if (bIsCurrent && FCppEditorSettings::Get().bHighlightActiveLine)
+			{
+				FSlateDrawElement::MakeBox(
+					OutDrawElements,
+					LayerId + 1,
+					AllottedGeometry.ToPaintGeometry(FVector2f(Width, LineHeight), FSlateLayoutTransform(FVector2f(0.0f, Y))),
+					FAppStyle::Get().GetBrush("WhiteBrush"),
+					ESlateDrawEffect::None,
+					FLinearColor(0.20f, 0.35f, 0.55f, 0.30f)
+				);
+			}
+
 			FLinearColor TextColor = bIsCurrent ? FLinearColor(0.95f, 0.95f, 1.0f, 1.0f) : FLinearColor(0.40f, 0.42f, 0.46f, 0.85f);
 
 			float TextX = Width - 8.0f - (LineNumberStr.Len() * 6.5f);
@@ -156,6 +170,113 @@ public:
 		}
 
 		return LayerId + 3;
+	}
+
+private:
+	SCppEditorPane* OwnerPane = nullptr;
+	TWeakPtr<SMultiLineEditableTextBox> TargetTextBox;
+};
+
+class SCppEditorGhostOverlay : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SCppEditorGhostOverlay) {}
+		SLATE_ARGUMENT(TSharedPtr<SMultiLineEditableTextBox>, TargetTextBox)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs, SCppEditorPane* InOwnerPane)
+	{
+		OwnerPane = InOwnerPane;
+		TargetTextBox = InArgs._TargetTextBox;
+		SetVisibility(EVisibility::HitTestInvisible);
+		SetClipping(EWidgetClipping::ClipToBounds);
+	}
+
+	virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override
+	{
+		if (!OwnerPane || !OwnerPane->HasGhostText() || !TargetTextBox.IsValid())
+		{
+			return LayerId;
+		}
+
+		FString GhostText = OwnerPane->GetActiveGhostText();
+		FTextLocation GhostLoc = OwnerPane->GetGhostTextLocation();
+		int32 GhostLine = GhostLoc.GetLineIndex();
+
+		int32 TotalLines = OwnerPane->GetTotalLineCount();
+		if (TotalLines <= 0)
+		{
+			return LayerId;
+		}
+
+		TSharedPtr<SMultiLineEditableTextBox> TextBox = TargetTextBox.Pin();
+		const float LineHeight = 18.0f;
+		int32 FirstLine = 0;
+		if (TextBox->GetVScrollBar().IsValid())
+		{
+			float ScrollFraction = TextBox->GetVScrollBar()->DistanceFromTop();
+			FirstLine = FMath::Clamp(FMath::FloorToInt(ScrollFraction * TotalLines), 0, FMath::Max(0, TotalLines - 1));
+		}
+
+		float Y = (GhostLine - FirstLine) * LineHeight + 4.0f;
+		float Height = AllottedGeometry.GetLocalSize().Y;
+		if (Y < 0.0f || Y + LineHeight > Height)
+		{
+			return LayerId;
+		}
+
+		FSlateFontInfo FontInfo = FCppEditorSettings::Get().GetFont();
+		TSharedRef<FSlateFontMeasure> FontMeasure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+
+		FString ActiveContent = OwnerPane->GetActiveContent();
+		TArray<FString> ContentLines;
+		ActiveContent.ParseIntoArrayLines(ContentLines, false);
+
+		float PrefixWidth = 0.0f;
+		if (ContentLines.IsValidIndex(GhostLine))
+		{
+			FString LineText = ContentLines[GhostLine];
+			int32 Offset = FMath::Clamp(GhostLoc.GetOffset(), 0, LineText.Len());
+			FString Prefix = LineText.Left(Offset);
+			Prefix.ReplaceInline(TEXT("\t"), TEXT("    "));
+			PrefixWidth = (float)FontMeasure->Measure(Prefix, FontInfo).X;
+		}
+
+		float StartX = PrefixWidth + 4.0f;
+
+		TArray<FString> GhostLines;
+		GhostText.ParseIntoArrayLines(GhostLines, false);
+		if (GhostLines.Num() == 0)
+		{
+			GhostLines.Add(GhostText);
+		}
+
+		const FLinearColor GhostColor(0.52f, 0.55f, 0.62f, 0.70f);
+
+		for (int32 i = 0; i < GhostLines.Num(); ++i)
+		{
+			float LineY = Y + i * LineHeight;
+			if (LineY + LineHeight > Height)
+			{
+				break;
+			}
+			float LineX = (i == 0) ? StartX : 4.0f;
+			FString DisplayLine = GhostLines[i];
+			DisplayLine.ReplaceInline(TEXT("\t"), TEXT("    "));
+
+			FSlateDrawElement::MakeText(
+				OutDrawElements,
+				LayerId + 5,
+				AllottedGeometry.ToPaintGeometry(FVector2f(AllottedGeometry.GetLocalSize().X - LineX, LineHeight), FSlateLayoutTransform(FVector2f(LineX, LineY))),
+				DisplayLine,
+				FontInfo,
+				ESlateDrawEffect::None,
+				GhostColor
+			);
+		}
+
+		return LayerId + 6;
 	}
 
 private:
@@ -480,7 +601,22 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 		]
 
 		// ---------------------------------------------------------------------
-		// 3. Code Editor & IntelliSense Overlay
+		// 3. Breadcrumbs Bar (Project > Module > Folder > File)
+		// ---------------------------------------------------------------------
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			SNew(SBorder)
+			.BorderImage(FAppStyle::Get().GetBrush("ToolPanel.DarkGroupBorder"))
+			.BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.10f, 0.95f))
+			.Padding(FMargin(8.0f, 3.0f))
+			[
+				SAssignNew(BreadcrumbsBox, SHorizontalBox)
+			]
+		]
+
+		// ---------------------------------------------------------------------
+		// 4. Code Editor & IntelliSense Overlay
 		// ---------------------------------------------------------------------
 		+ SVerticalBox::Slot()
 		.FillHeight(1.0f)
@@ -492,7 +628,7 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 			[
 				SNew(SOverlay)
 
-				// Base code editor with line number gutter
+				// Base code editor with line number gutter and ghost overlay
 				+ SOverlay::Slot()
 				[
 					SNew(SHorizontalBox)
@@ -504,11 +640,20 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 						GutterWidget.ToSharedRef()
 					]
 
-					// Code Editor
+					// Code Editor with Ghost Text Overlay
 					+ SHorizontalBox::Slot()
 					.FillWidth(1.0f)
 					[
-						CodeTextBox.ToSharedRef()
+						SNew(SOverlay)
+						+ SOverlay::Slot()
+						[
+							CodeTextBox.ToSharedRef()
+						]
+						+ SOverlay::Slot()
+						[
+							SAssignNew(GhostOverlayWidget, SCppEditorGhostOverlay, this)
+							.TargetTextBox(CodeTextBox)
+						]
 					]
 				]
 
@@ -768,7 +913,25 @@ void SCppEditorPane::ApplySettings()
 	if (CodeTextBox.IsValid())
 	{
 		CodeTextBox->SetAutoWrapText(Settings.bWordWrap);
-		CodeTextBox->Refresh();
+
+		// Force the internal text layout to flush and re-marshall runs with new style
+		if (ActiveDocumentIndex >= 0 && ActiveDocumentIndex < OpenDocuments.Num())
+		{
+			TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+			FTextLocation CursorLoc = CodeTextBox->GetCursorLocation();
+
+			Doc->bIsInternalTextChange = true;
+			CodeTextBox->SetText(FText::GetEmpty());
+			CodeTextBox->SetText(FText::FromString(Doc->CurrentContent));
+			Doc->bIsInternalTextChange = false;
+
+			CodeTextBox->GoTo(CursorLoc);
+			CodeTextBox->ScrollTo(CursorLoc);
+		}
+		else
+		{
+			CodeTextBox->Refresh();
+		}
 	}
 
 	// 2. Update Gutter visibility
@@ -918,6 +1081,8 @@ void SCppEditorPane::MoveDocumentTab(int32 OldIndex, int32 NewIndex)
 
 void SCppEditorPane::SetActiveDocumentIndex(int32 NewIndex)
 {
+	DismissGhostText();
+
 	if (NewIndex < 0 || NewIndex >= OpenDocuments.Num())
 	{
 		ActiveDocumentIndex = INDEX_NONE;
@@ -926,6 +1091,7 @@ void SCppEditorPane::SetActiveDocumentIndex(int32 NewIndex)
 			CodeTextBox->SetText(FText::GetEmpty());
 		}
 		RebuildTabStrip();
+		UpdateBreadcrumbs();
 		OnActiveDocumentChanged.ExecuteIfBound(FString());
 		return;
 	}
@@ -941,6 +1107,7 @@ void SCppEditorPane::SetActiveDocumentIndex(int32 NewIndex)
 	}
 
 	RebuildTabStrip();
+	UpdateBreadcrumbs();
 	FocusEditor();
 	OnActiveDocumentChanged.ExecuteIfBound(Doc->FilePath);
 }
@@ -3555,12 +3722,50 @@ FReply SCppEditorPane::HandleCodeTextBoxKeyChar(const FGeometry& MyGeometry, con
 		}
 	}
 
+	if (HasGhostText())
+	{
+		DismissGhostText();
+	}
+
+	if (FCppEditorSettings::Get().bEnableAiInlineCompletion)
+	{
+		bPendingAiRequest = true;
+		LastKeyStrokeTime = FPlatformTime::Seconds();
+	}
+
 	return FReply::Unhandled();
 }
 
 FReply SCppEditorPane::HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
+
+	// 0. AI Copilot Ghost Text Key Handling
+	if (HasGhostText())
+	{
+		if (Key == EKeys::Tab)
+		{
+			CommitGhostText();
+			return FReply::Handled();
+		}
+		if (Key == EKeys::Escape)
+		{
+			DismissGhostText();
+			return FReply::Handled();
+		}
+		if (Key == EKeys::Up || Key == EKeys::Down || Key == EKeys::Left || Key == EKeys::Right ||
+			Key == EKeys::PageUp || Key == EKeys::PageDown || Key == EKeys::Home || Key == EKeys::End)
+		{
+			DismissGhostText();
+		}
+	}
+
+	// Manual Trigger for AI Copilot Completion (Alt+/)
+	if (InKeyEvent.IsAltDown() && Key == EKeys::Slash)
+	{
+		TriggerAiInlineCompletion();
+		return FReply::Handled();
+	}
 
 	// 1. If IntelliSense popup is active, route navigation/commit keys
 	if (bIntelliSenseActive && FilteredIntelliSenseItems.Num() > 0)
@@ -4299,3 +4504,200 @@ void SCppEditorPane::QuickActionGenerateDefinition()
 		}
 	}
 }
+
+void SCppEditorPane::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+{
+	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+
+	// Debounce AI Copilot Inline Completion
+	if (bPendingAiRequest)
+	{
+		if (FCppEditorSettings::Get().bEnableAiInlineCompletion)
+		{
+			const double DelaySec = (double)FCppEditorSettings::Get().AiGhostTextDelayMs / 1000.0;
+			if (FPlatformTime::Seconds() - LastKeyStrokeTime >= DelaySec)
+			{
+				bPendingAiRequest = false;
+				TriggerAiInlineCompletion();
+			}
+		}
+		else
+		{
+			bPendingAiRequest = false;
+		}
+	}
+}
+
+void SCppEditorPane::TriggerAiInlineCompletion()
+{
+	if (!CodeTextBox.IsValid() || ActiveDocumentIndex == INDEX_NONE || ActiveDocumentIndex >= OpenDocuments.Num())
+	{
+		return;
+	}
+
+	TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+	FTextLocation CursorLoc = CodeTextBox->GetCursorLocation();
+
+	// Calculate character index from line/offset
+	const FString& Content = Doc->CurrentContent;
+	int32 TargetLine = CursorLoc.GetLineIndex();
+	int32 TargetOffset = CursorLoc.GetOffset();
+
+	int32 CurrentLine = 0;
+	int32 CharIndex = 0;
+	for (int32 i = 0; i < Content.Len(); ++i)
+	{
+		if (CurrentLine == TargetLine)
+		{
+			CharIndex = i + FMath::Clamp(TargetOffset, 0, Content.Len() - i);
+			break;
+		}
+		if (Content[i] == TEXT('\n'))
+		{
+			CurrentLine++;
+		}
+	}
+	if (CurrentLine < TargetLine)
+	{
+		CharIndex = Content.Len();
+	}
+
+	// Extract prefix (up to 2000 chars before cursor) and suffix (up to 500 chars after cursor)
+	int32 PrefixStart = FMath::Max(0, CharIndex - 2000);
+	FString Prefix = Content.Mid(PrefixStart, CharIndex - PrefixStart);
+
+	int32 SuffixLen = FMath::Min(500, Content.Len() - CharIndex);
+	FString Suffix = Content.Mid(CharIndex, SuffixLen);
+
+	TWeakPtr<SCppEditorPane> WeakThis = SharedThis(this);
+	FCppAiAssistant::Get().RequestInlineCompletion(
+		Prefix,
+		Suffix,
+		Doc->FilePath,
+		FOnAiCompletionReceived::CreateLambda([WeakThis, CursorLoc](const FString& CompletionText, bool bSuccess)
+		{
+			if (TSharedPtr<SCppEditorPane> Pinned = WeakThis.Pin())
+			{
+				Pinned->OnAiCompletionReceived(CompletionText, bSuccess, CursorLoc);
+			}
+		})
+	);
+}
+
+void SCppEditorPane::OnAiCompletionReceived(const FString& CompletionText, bool bSuccess, FTextLocation OriginalCursorLoc)
+{
+	if (!bSuccess || CompletionText.IsEmpty())
+	{
+		DismissGhostText();
+		return;
+	}
+
+	if (!CodeTextBox.IsValid())
+	{
+		return;
+	}
+
+	FTextLocation CurrentLoc = CodeTextBox->GetCursorLocation();
+	if (CurrentLoc != OriginalCursorLoc)
+	{
+		// Cursor moved in the meantime
+		return;
+	}
+
+	ActiveGhostText = CompletionText;
+	GhostTextLocation = OriginalCursorLoc;
+	bGhostTextVisible = true;
+}
+
+void SCppEditorPane::CommitGhostText()
+{
+	if (HasGhostText() && CodeTextBox.IsValid())
+	{
+		FString TextToInsert = ActiveGhostText;
+		DismissGhostText();
+		CodeTextBox->InsertTextAtCursor(TextToInsert);
+	}
+}
+
+void SCppEditorPane::DismissGhostText()
+{
+	bGhostTextVisible = false;
+	ActiveGhostText.Empty();
+	FCppAiAssistant::Get().CancelPendingCompletion();
+}
+
+void SCppEditorPane::InsertCodeAtCursor(const FString& InCode)
+{
+	if (CodeTextBox.IsValid() && !InCode.IsEmpty())
+	{
+		DismissGhostText();
+		CodeTextBox->InsertTextAtCursor(InCode);
+	}
+}
+
+void SCppEditorPane::UpdateBreadcrumbs()
+{
+	if (!BreadcrumbsBox.IsValid())
+	{
+		return;
+	}
+
+	BreadcrumbsBox->ClearChildren();
+
+	if (ActiveDocumentIndex == INDEX_NONE || ActiveDocumentIndex >= OpenDocuments.Num())
+	{
+		return;
+	}
+
+	TSharedPtr<FEditorDocument> Doc = OpenDocuments[ActiveDocumentIndex];
+	FString RelativePath = Doc->FilePath;
+	FPaths::MakePathRelativeTo(RelativePath, *FPaths::ProjectDir());
+
+	TArray<FString> Parts;
+	RelativePath.ParseIntoArray(Parts, TEXT("/"), true);
+	if (Parts.Num() == 0)
+	{
+		RelativePath.ParseIntoArray(Parts, TEXT("\\"), true);
+	}
+
+	FString ProjectName = FApp::GetProjectName();
+	if (ProjectName.IsEmpty())
+	{
+		ProjectName = TEXT("Project");
+	}
+
+	Parts.Insert(ProjectName, 0);
+
+	for (int32 i = 0; i < Parts.Num(); ++i)
+	{
+		const bool bIsLast = (i == Parts.Num() - 1);
+		const FString& Part = Parts[i];
+
+		BreadcrumbsBox->AddSlot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(2.0f, 0.0f)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(Part))
+				.Font(FCoreStyle::GetDefaultFontStyle(bIsLast ? "Bold" : "Regular", 9))
+				.ColorAndOpacity(bIsLast ? FLinearColor(0.92f, 0.92f, 0.96f, 1.0f) : FLinearColor(0.55f, 0.58f, 0.65f, 1.0f))
+				.ToolTipText(FText::FromString(Doc->FilePath))
+			];
+
+		if (!bIsLast)
+		{
+			BreadcrumbsBox->AddSlot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(2.0f, 0.0f)
+				[
+					SNew(STextBlock)
+					.Text(FText::FromString(TEXT("›")))
+					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
+					.ColorAndOpacity(FLinearColor(0.35f, 0.38f, 0.45f, 0.8f))
+				];
+		}
+	}
+}
+

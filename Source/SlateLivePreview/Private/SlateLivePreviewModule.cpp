@@ -3,6 +3,7 @@
 #include "SlateLivePreviewModule.h"
 #include "SSlateLivePreviewTab.h"
 #include "SCppStudioTab.h"
+#include "SSlateLivePreviewViewport.h"
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
@@ -15,6 +16,44 @@
 
 const FName FSlateLivePreviewModule::TabName(TEXT("SlateLivePreviewTab"));
 const FName FSlateLivePreviewModule::CppStudioTabName(TEXT("CppStudioTab"));
+
+static FAutoConsoleCommand GSnapshotCmd(
+	TEXT("SlateLivePreview.Snapshot"),
+	TEXT("Captures high-resolution snapshot of Slate Live Preview viewport to Saved/SlateLivePreview/preview.png or custom path. Usage: SlateLivePreview.Snapshot [OptionalPath]"),
+	FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
+	{
+		FString TargetPath;
+		if (Args.Num() > 0)
+		{
+			TargetPath = Args[0];
+		}
+
+		TWeakPtr<SSlateLivePreviewViewport> ViewportWeak = SSlateLivePreviewViewport::GetActiveViewport();
+		if (!ViewportWeak.IsValid())
+		{
+			FSlateLivePreviewModule::Get().OpenCppStudioTab();
+			ViewportWeak = SSlateLivePreviewViewport::GetActiveViewport();
+		}
+
+		if (TSharedPtr<SSlateLivePreviewViewport> Viewport = ViewportWeak.Pin())
+		{
+			if (Viewport->SaveSnapshotToFile(TargetPath))
+			{
+				FString ResolvedPath = TargetPath.IsEmpty() ? (FPaths::ProjectSavedDir() / TEXT("SlateLivePreview/preview.png")) : TargetPath;
+				FPaths::NormalizeFilename(ResolvedPath);
+				UE_LOG(LogTemp, Display, TEXT("[SlateLivePreview] SUCCESS: Snapshot saved to %s"), *ResolvedPath);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[SlateLivePreview] ERROR: Failed to capture snapshot."));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[SlateLivePreview] ERROR: No active Slate Live Preview viewport found. Open C++ Studio or Live Preview tab first."));
+		}
+	})
+);
 
 void FSlateLivePreviewModule::StartupModule()
 {

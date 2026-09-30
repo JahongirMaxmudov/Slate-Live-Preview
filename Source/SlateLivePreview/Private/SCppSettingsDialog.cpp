@@ -18,6 +18,7 @@
 #include "Styling/CoreStyle.h"
 #include "DesktopPlatformModule.h"
 #include "SlateLivePreviewStyle.h"
+#include "CppAiAssistant.h"
 
 static const TCHAR* SettingsSampleCode = 
 	TEXT("#include \"CoreMinimal.h\"\n")
@@ -51,6 +52,12 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 	bTempHighlightActiveLine = Current.bHighlightActiveLine;
 	bTempAutoSaveOnLiveCoding = Current.bAutoSaveOnLiveCoding;
 	bTempAutoReloadSlatePreview = Current.bAutoReloadSlatePreview;
+	bTempEnableAiInlineCompletion = Current.bEnableAiInlineCompletion;
+	TempAiProvider = Current.AiProvider;
+	TempAiEndpoint = Current.AiEndpoint;
+	TempAiModel = Current.AiModel;
+	TempAiApiKey = Current.AiApiKey;
+	TempAiGhostTextDelayMs = Current.AiGhostTextDelayMs;
 
 	// Populate Theme Options
 	for (int32 i = 0; i < (int32)ECppEditorTheme::Count; ++i)
@@ -82,6 +89,17 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 		if (Size == TempFontSize)
 		{
 			SelectedFontSizeOption = Option;
+		}
+	}
+
+	// Populate AI Provider Options
+	for (int32 i = 0; i < (int32)EAiProvider::Count; ++i)
+	{
+		TSharedPtr<FString> Option = MakeShared<FString>(FCppEditorSettings::GetAiProviderDisplayName((EAiProvider)i));
+		AiProviderOptions.Add(Option);
+		if ((EAiProvider)i == TempAiProvider)
+		{
+			SelectedAiProviderOption = Option;
 		}
 	}
 
@@ -598,6 +616,184 @@ void SCppSettingsDialog::Construct(const FArguments& InArgs)
 						]
 					]
 				]
+
+				// Section D: AI Copilot & Assistant (Ollama, LM Studio, DeepSeek, OpenAI)
+				+ SScrollBox::Slot()
+				.Padding(0.0f, 0.0f, 0.0f, 12.0f)
+				[
+					SNew(SBorder)
+					.BorderImage(FAppStyle::Get().GetBrush("ToolPanel.DarkGroupBorder"))
+					.Padding(10.0f)
+					[
+						SNew(SVerticalBox)
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 0.0f, 0.0f, 8.0f)
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(TEXT("AI Copilot & Assistant (Ollama, LM Studio, DeepSeek, OpenAI)")))
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 10.5f))
+							.ColorAndOpacity(FLinearColor(0.6f, 0.4f, 1.0f, 1.0f))
+						]
+
+						// Enable AI Inline Completion Checkbox
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 5.0f)
+						[
+							SNew(SCheckBox)
+							.IsChecked(bTempEnableAiInlineCompletion ? ECheckBoxState::Checked : ECheckBoxState::Unchecked)
+							.OnCheckStateChanged_Lambda([this](ECheckBoxState State) { bTempEnableAiInlineCompletion = (State == ECheckBoxState::Checked); })
+							[
+								SNew(STextBlock).Text(FText::FromString(TEXT("Enable Inline AI Ghost Text (Tab to accept, Esc to dismiss, Alt+/ to trigger)")))
+							]
+						]
+
+						// AI Provider Dropdown
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 4.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.35f)
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Provider:")))
+								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 9))
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.65f)
+							[
+								SNew(SComboBox<TSharedPtr<FString>>)
+								.OptionsSource(&AiProviderOptions)
+								.InitiallySelectedItem(SelectedAiProviderOption)
+								.OnGenerateWidget_Lambda([](TSharedPtr<FString> Item) -> TSharedRef<SWidget>
+								{
+									return SNew(STextBlock).Text(FText::FromString(*Item)).Font(FCoreStyle::GetDefaultFontStyle("Regular", 9));
+								})
+								.OnSelectionChanged_Lambda([this](TSharedPtr<FString> Selected, ESelectInfo::Type)
+								{
+									if (Selected.IsValid())
+									{
+										SelectedAiProviderOption = Selected;
+										int32 Index = AiProviderOptions.IndexOfByKey(Selected);
+										if (Index != INDEX_NONE)
+										{
+											TempAiProvider = (EAiProvider)Index;
+											UpdateAiProviderDefaults();
+										}
+									}
+								})
+								[
+									SNew(STextBlock)
+									.Text_Lambda([this]() -> FText
+									{
+										return SelectedAiProviderOption.IsValid() ? FText::FromString(*SelectedAiProviderOption) : FText::GetEmpty();
+									})
+									.Font(FCoreStyle::GetDefaultFontStyle("Bold", 9))
+								]
+							]
+						]
+
+						// Endpoint URL
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 4.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.35f)
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("API Endpoint:")))
+								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 9))
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.65f)
+							[
+								SNew(SEditableTextBox)
+								.Text_Lambda([this]() { return FText::FromString(TempAiEndpoint); })
+								.OnTextChanged_Lambda([this](const FText& Text) { TempAiEndpoint = Text.ToString(); })
+							]
+						]
+
+						// Model Name
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 4.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.35f)
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("Model Name:")))
+								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 9))
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.65f)
+							[
+								SNew(SEditableTextBox)
+								.Text_Lambda([this]() { return FText::FromString(TempAiModel); })
+								.OnTextChanged_Lambda([this](const FText& Text) { TempAiModel = Text.ToString(); })
+							]
+						]
+
+						// API Key
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 4.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.35f)
+							.VAlign(VAlign_Center)
+							[
+								SNew(STextBlock)
+								.Text(FText::FromString(TEXT("API Key:")))
+								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 9))
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(0.65f)
+							[
+								SNew(SEditableTextBox)
+								.Text_Lambda([this]() { return FText::FromString(TempAiApiKey); })
+								.HintText(FText::FromString(TEXT("Not required for local Ollama / LM Studio")))
+								.IsPassword(true)
+								.OnTextChanged_Lambda([this](const FText& Text) { TempAiApiKey = Text.ToString(); })
+							]
+						]
+
+						// Test Connection Button & Status
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 6.0f, 0.0f, 0.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.AutoWidth()
+							[
+								SNew(SButton)
+								.Text(FText::FromString(TEXT("Test Connection")))
+								.OnClicked(this, &SCppSettingsDialog::OnTestAiConnectionClicked)
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.VAlign(VAlign_Center)
+							.Padding(10.0f, 0.0f)
+							[
+								SAssignNew(AiTestStatusTextBlock, STextBlock)
+								.Text(FText::GetEmpty())
+								.Font(FCoreStyle::GetDefaultFontStyle("Regular", 8.5f))
+							]
+						]
+					]
+				]
 			]
 
 			// -----------------------------------------------------------------
@@ -664,7 +860,8 @@ void SCppSettingsDialog::UpdatePreview()
 	}
 	if (PreviewTextBox.IsValid())
 	{
-		PreviewTextBox->Refresh();
+		PreviewTextBox->SetText(FText::GetEmpty());
+		PreviewTextBox->SetText(FText::FromString(SettingsSampleCode));
 	}
 }
 
@@ -714,6 +911,41 @@ FReply SCppSettingsDialog::OnCancelClicked()
 	return FReply::Handled();
 }
 
+void SCppSettingsDialog::UpdateAiProviderDefaults()
+{
+	TempAiEndpoint = FCppEditorSettings::GetDefaultEndpointForProvider(TempAiProvider);
+	TempAiModel = FCppEditorSettings::GetDefaultModelForProvider(TempAiProvider);
+	if (TempAiProvider == EAiProvider::LocalOllama || TempAiProvider == EAiProvider::LMStudio)
+	{
+		TempAiApiKey.Empty();
+	}
+}
+
+FReply SCppSettingsDialog::OnTestAiConnectionClicked()
+{
+	if (AiTestStatusTextBlock.IsValid())
+	{
+		AiTestStatusTextBlock->SetText(FText::FromString(TEXT("Testing connection...")));
+		AiTestStatusTextBlock->SetColorAndOpacity(FLinearColor(0.8f, 0.8f, 0.8f, 1.0f));
+	}
+
+	FCppAiAssistant::Get().TestConnection(
+		TempAiEndpoint,
+		TempAiModel,
+		TempAiApiKey,
+		FOnAiTestResult::CreateLambda([this](bool bSuccess, const FString& Message)
+		{
+			if (AiTestStatusTextBlock.IsValid())
+			{
+				AiTestStatusTextBlock->SetText(FText::FromString(Message));
+				AiTestStatusTextBlock->SetColorAndOpacity(bSuccess ? FLinearColor(0.2f, 0.9f, 0.4f, 1.0f) : FLinearColor(1.0f, 0.35f, 0.35f, 1.0f));
+			}
+		})
+	);
+
+	return FReply::Handled();
+}
+
 FReply SCppSettingsDialog::OnApplyClicked()
 {
 	FCppEditorSettings& Settings = FCppEditorSettings::Get();
@@ -730,6 +962,12 @@ FReply SCppSettingsDialog::OnApplyClicked()
 	Settings.bHighlightActiveLine = bTempHighlightActiveLine;
 	Settings.bAutoSaveOnLiveCoding = bTempAutoSaveOnLiveCoding;
 	Settings.bAutoReloadSlatePreview = bTempAutoReloadSlatePreview;
+	Settings.bEnableAiInlineCompletion = bTempEnableAiInlineCompletion;
+	Settings.AiProvider = TempAiProvider;
+	Settings.AiEndpoint = TempAiEndpoint;
+	Settings.AiModel = TempAiModel;
+	Settings.AiApiKey = TempAiApiKey;
+	Settings.AiGhostTextDelayMs = TempAiGhostTextDelayMs;
 
 	Settings.Save();
 
@@ -744,7 +982,7 @@ void SCppSettingsDialog::OpenModal(TSharedPtr<SWidget> ParentWidget)
 {
 	TSharedRef<SWindow> Window = SNew(SWindow)
 		.Title(FText::FromString(TEXT("C++ Studio Settings")))
-		.ClientSize(FVector2D(640.0f, 620.0f))
+		.ClientSize(FVector2D(660.0f, 700.0f))
 		.SupportsMaximize(false)
 		.SupportsMinimize(false)
 		.SizingRule(ESizingRule::FixedSize);

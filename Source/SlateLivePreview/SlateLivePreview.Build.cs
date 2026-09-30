@@ -31,6 +31,9 @@ public class SlateLivePreview : ModuleRules
 				"RenderCore",
 				"ApplicationCore",
 				"Projects",
+				"HTTP",
+				"Json",
+				"JsonUtilities",
 			}
 		);
 

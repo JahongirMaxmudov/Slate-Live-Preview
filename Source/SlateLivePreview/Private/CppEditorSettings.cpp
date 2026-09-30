@@ -36,6 +36,15 @@ void FCppEditorSettings::ResetToDefaults()
 	bHighlightActiveLine = true;
 	bAutoSaveOnLiveCoding = true;
 	bAutoReloadSlatePreview = true;
+
+	bEnableAiInlineCompletion = true;
+	AiProvider = EAiProvider::LocalOllama;
+	AiEndpoint = TEXT("http://localhost:11434/v1");
+	AiModel = TEXT("deepseek-coder");
+	AiApiKey.Empty();
+	AiGhostTextDelayMs = 400;
+	AiMaxTokens = 128;
+	AiTemperature = 0.2f;
 }
 
 void FCppEditorSettings::Load()
@@ -75,6 +84,21 @@ void FCppEditorSettings::Load()
 	GConfig->GetBool(ConfigSection, TEXT("HighlightActiveLine"), bHighlightActiveLine, GEditorPerProjectIni);
 	GConfig->GetBool(ConfigSection, TEXT("AutoSaveOnLiveCoding"), bAutoSaveOnLiveCoding, GEditorPerProjectIni);
 	GConfig->GetBool(ConfigSection, TEXT("AutoReloadSlatePreview"), bAutoReloadSlatePreview, GEditorPerProjectIni);
+
+	// AI Settings
+	GConfig->GetBool(ConfigSection, TEXT("EnableAiInlineCompletion"), bEnableAiInlineCompletion, GEditorPerProjectIni);
+	int32 AiProvInt = (int32)AiProvider;
+	GConfig->GetInt(ConfigSection, TEXT("AiProvider"), AiProvInt, GEditorPerProjectIni);
+	if (AiProvInt >= 0 && AiProvInt < (int32)EAiProvider::Count)
+	{
+		AiProvider = (EAiProvider)AiProvInt;
+	}
+	GConfig->GetString(ConfigSection, TEXT("AiEndpoint"), AiEndpoint, GEditorPerProjectIni);
+	GConfig->GetString(ConfigSection, TEXT("AiModel"), AiModel, GEditorPerProjectIni);
+	GConfig->GetString(ConfigSection, TEXT("AiApiKey"), AiApiKey, GEditorPerProjectIni);
+	GConfig->GetInt(ConfigSection, TEXT("AiGhostTextDelayMs"), AiGhostTextDelayMs, GEditorPerProjectIni);
+	GConfig->GetInt(ConfigSection, TEXT("AiMaxTokens"), AiMaxTokens, GEditorPerProjectIni);
+	GConfig->GetFloat(ConfigSection, TEXT("AiTemperature"), AiTemperature, GEditorPerProjectIni);
 }
 
 void FCppEditorSettings::Save()
@@ -94,6 +118,16 @@ void FCppEditorSettings::Save()
 	GConfig->SetBool(ConfigSection, TEXT("HighlightActiveLine"), bHighlightActiveLine, GEditorPerProjectIni);
 	GConfig->SetBool(ConfigSection, TEXT("AutoSaveOnLiveCoding"), bAutoSaveOnLiveCoding, GEditorPerProjectIni);
 	GConfig->SetBool(ConfigSection, TEXT("AutoReloadSlatePreview"), bAutoReloadSlatePreview, GEditorPerProjectIni);
+
+	// AI Settings
+	GConfig->SetBool(ConfigSection, TEXT("EnableAiInlineCompletion"), bEnableAiInlineCompletion, GEditorPerProjectIni);
+	GConfig->SetInt(ConfigSection, TEXT("AiProvider"), (int32)AiProvider, GEditorPerProjectIni);
+	GConfig->SetString(ConfigSection, TEXT("AiEndpoint"), *AiEndpoint, GEditorPerProjectIni);
+	GConfig->SetString(ConfigSection, TEXT("AiModel"), *AiModel, GEditorPerProjectIni);
+	GConfig->SetString(ConfigSection, TEXT("AiApiKey"), *AiApiKey, GEditorPerProjectIni);
+	GConfig->SetInt(ConfigSection, TEXT("AiGhostTextDelayMs"), AiGhostTextDelayMs, GEditorPerProjectIni);
+	GConfig->SetInt(ConfigSection, TEXT("AiMaxTokens"), AiMaxTokens, GEditorPerProjectIni);
+	GConfig->SetFloat(ConfigSection, TEXT("AiTemperature"), AiTemperature, GEditorPerProjectIni);
 
 	GConfig->Flush(false, GEditorPerProjectIni);
 
@@ -400,4 +434,43 @@ const TArray<int32>& FCppEditorSettings::GetAvailableFontSizes()
 {
 	static const TArray<int32> Sizes = { 9, 10, 11, 12, 13, 14, 16, 18, 20 };
 	return Sizes;
+}
+
+FString FCppEditorSettings::GetAiProviderDisplayName(EAiProvider InProvider)
+{
+	switch (InProvider)
+	{
+	case EAiProvider::LocalOllama: return TEXT("Local Ollama (Offline, 100% Free, Private)");
+	case EAiProvider::LMStudio:    return TEXT("LM Studio (Local server)");
+	case EAiProvider::DeepSeek:    return TEXT("DeepSeek API (deepseek-coder)");
+	case EAiProvider::OpenAI:      return TEXT("OpenAI (gpt-4o-mini / gpt-4o)");
+	case EAiProvider::Custom:      return TEXT("Custom OpenAI-compatible Endpoint");
+	default: return TEXT("Unknown");
+	}
+}
+
+FString FCppEditorSettings::GetDefaultEndpointForProvider(EAiProvider InProvider)
+{
+	switch (InProvider)
+	{
+	case EAiProvider::LocalOllama: return TEXT("http://localhost:11434/v1");
+	case EAiProvider::LMStudio:    return TEXT("http://localhost:1234/v1");
+	case EAiProvider::DeepSeek:    return TEXT("https://api.deepseek.com/v1");
+	case EAiProvider::OpenAI:      return TEXT("https://api.openai.com/v1");
+	case EAiProvider::Custom:      return TEXT("http://localhost:8000/v1");
+	default: return TEXT("http://localhost:11434/v1");
+	}
+}
+
+FString FCppEditorSettings::GetDefaultModelForProvider(EAiProvider InProvider)
+{
+	switch (InProvider)
+	{
+	case EAiProvider::LocalOllama: return TEXT("deepseek-coder");
+	case EAiProvider::LMStudio:    return TEXT("qwen2.5-coder-7b-instruct");
+	case EAiProvider::DeepSeek:    return TEXT("deepseek-coder");
+	case EAiProvider::OpenAI:      return TEXT("gpt-4o-mini");
+	case EAiProvider::Custom:      return TEXT("default");
+	default: return TEXT("deepseek-coder");
+	}
 }
