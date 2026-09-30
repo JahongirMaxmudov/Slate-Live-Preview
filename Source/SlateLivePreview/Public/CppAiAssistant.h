@@ -80,9 +80,8 @@ private:
 	FString ActiveDeviceCode;
 	int32 DevicePollInterval = 5;
 	double DeviceAuthExpiresAt = 0.0;
-	FOnGitHubAuthComplete ActiveAuthCompleteCallback;
 
-	void PollGitHubDeviceToken();
+	void PollGitHubDeviceToken(FOnGitHubAuthComplete OnComplete);
 	void FetchGitHubUsername(const FString& InAccessToken, TFunction<void(const FString&)> OnUsernameFetched);
 
 	static FString CleanGeneratedCode(const FString& RawResponse);

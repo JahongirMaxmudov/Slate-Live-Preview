@@ -27,6 +27,7 @@
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Rendering/DrawElements.h"
+#include "Framework/Text/SlateTextLayout.h"
 
 class SCppEditorGutter : public SCompoundWidget
 {
@@ -309,6 +310,16 @@ void SCppEditorPane::Construct(const FArguments& InArgs)
 		.OnKeyDownHandler(this, &SCppEditorPane::HandleCodeTextBoxKeyDown)
 		.OnKeyCharHandler(this, &SCppEditorPane::HandleCodeTextBoxKeyChar)
 		.OnContextMenuOpening(this, &SCppEditorPane::OnEditorContextMenuOpening)
+		.CreateSlateTextLayout_Lambda([this](SWidget* InWidget, const FTextBlockStyle& InTextStyle) -> TSharedRef<FSlateTextLayout>
+		{
+			TSharedRef<FSlateTextLayout> Layout = FSlateTextLayout::Create(InWidget, InTextStyle);
+			ActiveSlateTextLayout = Layout;
+			if (InWidget)
+			{
+				ActiveEditableTextWidget = InWidget->AsShared();
+			}
+			return Layout;
+		})
 		.OnCursorMoved_Lambda([this](const FTextLocation&)
 		{
 			if (bIntelliSenseActive)
@@ -3817,6 +3828,44 @@ FString SCppEditorPane::GetWordAtScreenPosition(const FVector2D& ScreenPos)
 		return FString();
 	}
 
+	// 1. Native Slate TextLayout hit testing (exact, pixel-perfect, font/padding agnostic)
+	if (ActiveSlateTextLayout.IsValid() && ActiveEditableTextWidget.IsValid())
+	{
+		TSharedPtr<SWidget> TextWidget = ActiveEditableTextWidget.Pin();
+		if (TextWidget.IsValid())
+		{
+			FGeometry TextGeo = TextWidget->GetTickSpaceGeometry();
+			FVector2f LocalPos = TextGeo.AbsoluteToLocal(ScreenPos);
+			FVector2f LocalSize = TextGeo.GetLocalSize();
+			if (LocalPos.X >= 0.0f && LocalPos.X <= LocalSize.X && LocalPos.Y >= 0.0f && LocalPos.Y <= LocalSize.Y)
+			{
+				FVector2d ScaledPos = FVector2d(LocalPos * TextGeo.Scale);
+				FTextLocation HitLocation = ActiveSlateTextLayout->GetTextLocationAt(ScaledPos);
+				FTextSelection WordSelection = ActiveSlateTextLayout->GetWordAt(HitLocation);
+				FString FoundWord;
+				ActiveSlateTextLayout->GetSelectionAsText(FoundWord, WordSelection);
+				FoundWord = FoundWord.TrimStartAndEnd();
+				if (!FoundWord.IsEmpty() && (FChar::IsAlnum(FoundWord[0]) || FoundWord[0] == TEXT('_')))
+				{
+					bool bValidIdent = true;
+					for (int32 i = 0; i < FoundWord.Len(); ++i)
+					{
+						if (!FChar::IsAlnum(FoundWord[i]) && FoundWord[i] != TEXT('_'))
+						{
+							bValidIdent = false;
+							break;
+						}
+					}
+					if (bValidIdent)
+					{
+						return FoundWord;
+					}
+				}
+				return FString();
+			}
+		}
+	}
+
 	FGeometry TextGeo = CodeTextBox->GetTickSpaceGeometry();
 	FVector2D LocalPos = TextGeo.AbsoluteToLocal(ScreenPos);
 	FVector2D TextSize = (FVector2D)TextGeo.GetLocalSize();
@@ -4735,6 +4784,37 @@ int32 SCppEditorPane::GetTotalLineCount() const
 
 float SCppEditorPane::GetEditorLineHeight() const
 {
+	if (ActiveSlateTextLayout.IsValid())
+	{
+		const TArray<FTextLayout::FLineView>& Views = ActiveSlateTextLayout->GetLineViews();
+		if (Views.Num() >= 2)
+		{
+			float Diff = (float)(Views[1].Offset.Y - Views[0].Offset.Y);
+			float LayoutScale = ActiveSlateTextLayout->GetScale();
+			if (LayoutScale > 0.0f)
+			{
+				Diff /= LayoutScale;
+			}
+			if (Diff >= 8.0f && Diff <= 100.0f)
+			{
+				return Diff;
+			}
+		}
+		else if (Views.Num() == 1)
+		{
+			float Height = (float)Views[0].Size.Y;
+			float LayoutScale = ActiveSlateTextLayout->GetScale();
+			if (LayoutScale > 0.0f)
+			{
+				Height /= LayoutScale;
+			}
+			if (Height >= 8.0f && Height <= 100.0f)
+			{
+				return Height;
+			}
+		}
+	}
+
 	const int32 Size = FCppEditorSettings::Get().FontSize;
 	return FMath::RoundToFloat((float)Size * (18.0f / 11.0f));
 }

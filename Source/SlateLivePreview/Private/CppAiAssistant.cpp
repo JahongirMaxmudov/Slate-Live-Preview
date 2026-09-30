@@ -476,7 +476,6 @@ void FCppAiAssistant::CancelGitHubAuth()
 void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeReceived, FOnGitHubAuthComplete InComplete)
 {
 	CancelGitHubAuth();
-	ActiveAuthCompleteCallback = InComplete;
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(TEXT("https://github.com/login/device/code"));
@@ -490,13 +489,13 @@ void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeRe
 	Request->SetContentAsString(Payload);
 
 	Request->OnProcessRequestComplete().BindLambda(
-		[this, InCodeReceived](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
+		[this, InCodeReceived, InComplete](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
 		{
 			ActiveDeviceAuthRequest.Reset();
 			if (!bSuccess || !Response.IsValid() || Response->GetResponseCode() != 200)
 			{
 				FString Err = Response.IsValid() ? Response->GetContentAsString() : TEXT("Network failure");
-				ActiveAuthCompleteCallback.ExecuteIfBound(false, FString::Printf(TEXT("Failed to start device auth: %s"), *Err));
+				InComplete.ExecuteIfBound(false, FString::Printf(TEXT("Failed to start device auth: %s"), *Err));
 				return;
 			}
 
@@ -504,7 +503,7 @@ void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeRe
 			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
 			if (!FJsonSerializer::Deserialize(Reader, RootObj) || !RootObj.IsValid())
 			{
-				ActiveAuthCompleteCallback.ExecuteIfBound(false, TEXT("Invalid response from GitHub."));
+				InComplete.ExecuteIfBound(false, TEXT("Invalid response from GitHub."));
 				return;
 			}
 
@@ -533,9 +532,9 @@ void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeRe
 			DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 				TEXT("GitHubCopilotDevicePoll"),
 				(float)DevicePollInterval,
-				[this](float) -> bool
+				[this, InComplete](float) -> bool
 				{
-					PollGitHubDeviceToken();
+					PollGitHubDeviceToken(InComplete);
 					return false; // single execution; will reschedule on each tick
 				}
 			);
@@ -546,7 +545,7 @@ void FCppAiAssistant::StartGitHubDeviceFlow(FOnGitHubDeviceCodeReceived InCodeRe
 	Request->ProcessRequest();
 }
 
-void FCppAiAssistant::PollGitHubDeviceToken()
+void FCppAiAssistant::PollGitHubDeviceToken(FOnGitHubAuthComplete OnComplete)
 {
 	if (ActiveDeviceCode.IsEmpty())
 	{
@@ -556,7 +555,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 	if (FPlatformTime::Seconds() >= DeviceAuthExpiresAt)
 	{
 		CancelGitHubAuth();
-		ActiveAuthCompleteCallback.ExecuteIfBound(false, TEXT("Authorization session timed out. Please try again."));
+		OnComplete.ExecuteIfBound(false, TEXT("Authorization session timed out. Please try again."));
 		return;
 	}
 
@@ -574,7 +573,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 	Request->SetContentAsString(Payload);
 
 	Request->OnProcessRequestComplete().BindLambda(
-		[this](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
+		[this, OnComplete](FHttpRequestPtr, FHttpResponsePtr Response, bool bSuccess)
 		{
 			ActiveDeviceAuthRequest.Reset();
 			if (!bSuccess || !Response.IsValid())
@@ -583,7 +582,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 				DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 					TEXT("GitHubCopilotDevicePoll"),
 					(float)DevicePollInterval,
-					[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+					[this, OnComplete](float) -> bool { PollGitHubDeviceToken(OnComplete); return false; }
 				);
 				return;
 			}
@@ -595,7 +594,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 				DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 					TEXT("GitHubCopilotDevicePoll"),
 					(float)DevicePollInterval,
-					[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+					[this, OnComplete](float) -> bool { PollGitHubDeviceToken(OnComplete); return false; }
 				);
 				return;
 			}
@@ -609,7 +608,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 					DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 						TEXT("GitHubCopilotDevicePoll"),
 						(float)DevicePollInterval,
-						[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+						[this, OnComplete](float) -> bool { PollGitHubDeviceToken(OnComplete); return false; }
 					);
 					return;
 				}
@@ -619,7 +618,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 					DevicePollTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
 						TEXT("GitHubCopilotDevicePoll"),
 						(float)DevicePollInterval,
-						[this](float) -> bool { PollGitHubDeviceToken(); return false; }
+						[this, OnComplete](float) -> bool { PollGitHubDeviceToken(OnComplete); return false; }
 					);
 					return;
 				}
@@ -627,7 +626,7 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 				{
 					FString Desc = RootObj->HasField(TEXT("error_description")) ? RootObj->GetStringField(TEXT("error_description")) : Error;
 					CancelGitHubAuth();
-					ActiveAuthCompleteCallback.ExecuteIfBound(false, Desc);
+					OnComplete.ExecuteIfBound(false, Desc);
 					return;
 				}
 			}
@@ -645,21 +644,21 @@ void FCppAiAssistant::PollGitHubDeviceToken()
 				Settings.Save();
 
 				// Fetch Username & Copilot Session Token
-				FetchGitHubUsername(AccessToken, [this, AccessToken](const FString& Username)
+				FetchGitHubUsername(AccessToken, [this, AccessToken, OnComplete](const FString& Username)
 				{
 					FCppEditorSettings& Settings = FCppEditorSettings::Get();
 					Settings.GitHubUsername = Username;
 					Settings.Save();
 
-					FetchCopilotToken(AccessToken, [this, Username](bool bCopilotSuccess, const FString& CopilotMsg)
+					FetchCopilotToken(AccessToken, [this, Username, OnComplete](bool bCopilotSuccess, const FString& CopilotMsg)
 					{
 						if (bCopilotSuccess)
 						{
-							ActiveAuthCompleteCallback.ExecuteIfBound(true, Username);
+							OnComplete.ExecuteIfBound(true, Username);
 						}
 						else
 						{
-							ActiveAuthCompleteCallback.ExecuteIfBound(true, FString::Printf(TEXT("%s (Note: %s)"), *Username, *CopilotMsg));
+							OnComplete.ExecuteIfBound(true, FString::Printf(TEXT("%s (Note: %s)"), *Username, *CopilotMsg));
 						}
 					});
 				});

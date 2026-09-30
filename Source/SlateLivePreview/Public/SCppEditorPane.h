@@ -14,6 +14,7 @@ class STextBlock;
 class SBorder;
 class SHorizontalBox;
 class FCppSyntaxHighlighterMarshaller;
+class FSlateTextLayout;
 
 DECLARE_DELEGATE_OneParam(FOnActiveDocumentChanged, const FString& /* FilePath */);
 DECLARE_DELEGATE_TwoParams(FOnDocumentContentChanged, const FString& /* FilePath */, const FString& /* Content */);
@@ -218,6 +219,10 @@ private:
 	void ShowHoverDoc(const FString& Word, const FVector2D& ScreenPos);
 	void DismissHoverDoc();
 	TSharedPtr<FIntelliSenseItem> FindDocItemForWord(const FString& Word) const;
+
+	// Native Slate Text Layout tracking for pixel-perfect hit testing
+	TSharedPtr<FSlateTextLayout> ActiveSlateTextLayout;
+	TWeakPtr<SWidget> ActiveEditableTextWidget;
 
 	bool bEnterKeyHandledInKeyDown = false;
 	FReply HandleCodeTextBoxKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent);
